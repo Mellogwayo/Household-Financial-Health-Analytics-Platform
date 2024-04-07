@@ -59,3 +59,7 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 ## Citation
 
 University of Essex, Institute for Social and Economic Research. (2022). Understanding Society: Calendar Year Dataset, 2020. [data collection]. UK Data Service. SN: 8988, DOI: [http://doi.org/10.5255/UKDA-SN-8988-1](http://doi.org/10.5255/UKDA-SN-8988-1)
+
+---
+
+For more information, please contact the project maintainer at mellogwayo@gmail.com.
