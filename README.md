@@ -48,13 +48,13 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 
 ## Files and Usage
 
-- **Data Files**: Original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) extracted to create the `variables for analysis.db`.
-- **Data Dictionaries**: RTF data dictionaries (`jkl_indresp_ukda_data_dictionary.rtf` & `jkl_hhresp_ukda_data_dictionary.rtf`) processed into CSV format for ease of use.
-- **R Scripts**: `analysis.R` and `Cleaning data dictionaries.R` scripts for data processing and visualization.
-- **Python Scripts**: `TransformCategoricalCodes_to_Labels.ipynb` for transforming and cleaning datasets.
-- **Database**: `variables for analysis.db` containing the structured dataset.
-- **CSV Files**: `variables.csv` as the raw dataset and `transformed_variables.csv` as the cleaned and labeled dataset.
-- **Project Files**: RStudio project file and DB Browser for SQLite project file (`variables for analysis.sqbpro`) to manage the database.
+- **Data Files**: Located in the `data/raw` directory, original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) are the backbone for analysis.
+- **Data Dictionaries**: Found in `data/dictionaries`, RTF data dictionaries (`jkl_indresp_ukda_data_dictionary.rtf` & `jkl_hhresp_ukda_data_dictionary.rtf`) have been processed into CSV format (`hhresp_data_dictionary.csv` & `indresp_data_dictionary.csv`) for ease of use.
+- **Processed Data**: In `data/processed`, `variables.csv` as the raw dataset and `transformed_variables.csv` for the cleaned and labeled dataset ready for analysis.
+- **R Scripts**: Contained in `scripts/R`, `Cleaning data dictionaries.R` and `analysis.R` scripts are used for data processing and visualization.
+- **Python Scripts**: The `TransformCategoricalCodes_to_Labels.ipynb` notebook in `scripts/Python` is for transforming and cleaning datasets.
+- **Database**: The `variables for analysis.db` in the `database` directory contains the structured dataset for analysis.
+- **Project Files**: Includes the RStudio project file and DB Browser for SQLite project file (`variables for analysis.sqbpro`) in the `project_files` directory to manage and interact with the database efficiently.
 
 ## Citation
 
@@ -63,3 +63,4 @@ University of Essex, Institute for Social and Economic Research. (2022). Underst
 ---
 
 For more information, please contact the project maintainer at mellogwayo@gmail.com.
+
