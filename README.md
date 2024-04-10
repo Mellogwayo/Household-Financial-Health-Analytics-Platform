@@ -51,7 +51,7 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 - **Data Files**: Located in the `data/raw` directory, original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) are the backbone for analysis.
 - **Data Dictionaries**: Found in `data/dictionaries`, RTF data dictionaries (`jkl_indresp_ukda_data_dictionary.rtf` & `jkl_hhresp_ukda_data_dictionary.rtf`) have been processed into CSV format (`hhresp_data_dictionary.csv` & `indresp_data_dictionary.csv`) for ease of use.
 - **Processed Data**: In `data/processed`, `variables.csv` as the raw dataset and `transformed_variables.csv` for the cleaned and labeled dataset ready for analysis.
-- **R Scripts**: Contained in `scripts/R`, `Cleaning data dictionaries.R` and `analysis.R` scripts are used for data processing and visualization.
+- **R Scripts**: Contained in `scripts/R`, the `Cleaning data dictionaries.R`, `analysis.R`, and `Household_Financial_Health_Analytics_App.R` scripts are used for data processing, visualization, and interactive analysis through a Shiny application.
 - **Python Scripts**: The `TransformCategoricalCodes_to_Labels.ipynb` notebook in `scripts/Python` is for transforming and cleaning datasets.
 - **Database**: The `variables for analysis.db` in the `database` directory contains the structured dataset for analysis.
 - **Project Files**: Includes the RStudio project file and DB Browser for SQLite project file (`variables for analysis.sqbpro`) in the `project_files` directory to manage and interact with the database efficiently.
