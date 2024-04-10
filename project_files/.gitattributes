@@ -1,0 +1,2 @@
+database/variables[[:space:]]for[[:space:]]analysis.db filter=lfs diff=lfs merge=lfs -text
+data/raw/jkl_indresp.tab.csv filter=lfs diff=lfs merge=lfs -text
