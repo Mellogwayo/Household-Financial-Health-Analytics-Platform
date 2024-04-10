@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/variables for analysis.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="227544"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><current_table name="4,10:mainjkl_hhresp"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="data" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="72"/><column index="2" value="63"/><column index="3" value="40"/><column index="4" value="44"/><column index="5" value="63"/><column index="6" value="47"/><column index="7" value="62"/><column index="8" value="57"/><column index="9" value="63"/><column index="10" value="63"/><column index="11" value="68"/><column index="12" value="63"/><column index="13" value="65"/><column index="14" value="63"/><column index="15" value="67"/><column index="16" value="62"/><column index="17" value="71"/><column index="18" value="63"/><column index="19" value="53"/><column index="20" value="63"/><column index="21" value="59"/><column index="22" value="67"/><column index="23" value="62"/><column index="24" value="75"/><column index="25" value="63"/><column index="26" value="70"/><column index="27" value="64"/><column index="28" value="81"/><column index="29" value="77"/><column index="30" value="58"/><column index="31" value="69"/><column index="32" value="63"/><column index="33" value="80"/><column index="34" value="87"/><column index="35" value="93"/><column index="36" value="92"/><column index="37" value="93"/><column index="38" value="85"/><column index="39" value="101"/><column index="40" value="88"/><column index="41" value="86"/><column index="42" value="59"/><column index="43" value="82"/><column index="44" value="83"/><column index="45" value="60"/><column index="46" value="73"/><column index="47" value="81"/><column index="48" value="79"/><column index="49" value="103"/><column index="50" value="96"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">DROP TABLE IF EXISTS data;
+
+CREATE TABLE data AS
+SELECT 
+    i.pidp, i.jkl_hidp, i.j_hidp, i.k_hidp, i.l_hidp, i.jkl_pno, i.jkl_mnpno, i.jkl_fnpno, 
+    i.jkl_mnpid, i.jkl_fnpid, i.jkl_mnspno, i.jkl_fnspno, i.jkl_mnspid, i.jkl_fnspid, 
+    i.jkl_grmpno, i.jkl_grfpno, i.jkl_childpno, i.jkl_ppid, i.jkl_ppno, i.jkl_sppid, 
+    i.jkl_sppno, i.jkl_country, i.jkl_gor_dv, i.jkl_urban_dv, i.jkl_sex_dv, i.jkl_doby_dv, 
+    i.jkl_age_dv, i.jkl_mastat_dv, i.jkl_nchild_dv, i.jkl_jbstat, i.jkl_ethn_dv, i.bornuk_dv, 
+    i.jkl_hiqual_dv, i.jkl_jbsoc00_cc, i.jkl_jbnssec8_dv, i.jkl_jbnssec5_dv, i.jkl_jbnssec3_dv, 
+    i.jkl_fimnnet_dv, i.jkl_fimnlabnet_dv, i.jkl_sf12mcs_dv, i.jkl_sf12pcs_dv, i.jkl_health, 
+    i.jkl_scghq1_dv, i.jkl_scghq2_dv, i.jkl_hhsize, i.jkl_nkids_dv, i.jkl_hhtype_dv, 
+    h.jkl_tenure_dv, h.jkl_fihhmnnet1_dv, h.jkl_ieqmoecd_dv
+FROM 
+    jkl_indresp i
+INNER JOIN 
+    jkl_hhresp h ON i.jkl_hidp = h.jkl_hidp;
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
