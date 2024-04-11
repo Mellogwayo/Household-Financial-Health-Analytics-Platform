@@ -1,0 +1,8 @@
+# Ignore specific large files
+database/variables for analysis.db
+data/raw/jkl_indresp.tab.csv
+
+# Alternatively, ignore entire directories
+database/
+data/raw/
+
