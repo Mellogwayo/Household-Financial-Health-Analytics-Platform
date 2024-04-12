@@ -2,7 +2,12 @@
 .Rhistory
 .RData
 .Ruserdata
-database/variables
+
+# Ignore directories
+node_modules/
+logs/
+
+# Ignore specific files
+database/variables_for_analysis.db
 data/raw/jkl_indresp.tab.csv
 
-database/
