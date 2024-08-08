@@ -2,8 +2,7 @@ library(shiny)
 library(ggplot2)
 library(dplyr)
 
-# Assume 'data' is your loaded data frame with the necessary variables
-
+# THIS IS A TEST FILE AND WILL BE CHANGED IN FUTURE
 # Define the user interface (UI)
 ui <- fluidPage(
   titlePanel("Household Financial Health Analytics Platform"),

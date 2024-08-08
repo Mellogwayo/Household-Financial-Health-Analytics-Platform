@@ -1,0 +1,2831 @@
+---
+title: "Household Financial Health Analytics Exploratory Data Analysis"
+author: "MELISSA OGWAYO"
+date: "2024-08-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Necessary Libraries
+
+```{r}
+# Function to check and install packages if not already installed
+install_if_missing <- function(packages) {
+  for (pkg in packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE)
+  }
+}
+
+# List of necessary packages
+packages <- c("RSQLite", "ggplot2", "tidyr", "dplyr", "plotly", "sf", "viridis", "rmapshaper", "rlang", "scales", "gridExtra")
+
+# Install and load the necessary packages
+install_if_missing(packages)
+
+```
+
+## Initial Data Preparation
+
+```{r, eval = FALSE}
+# Only run the next codes if being run for the first time
+# Adjusted path for the database
+# con <- dbConnect(RSQLite::SQLite(), "/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/database/variables for analysis.db")
+# 'data' is the table name within the SQLite database
+# df <- dbReadTable(con, "data")
+# Close the connection
+# dbDisconnect(con)
+# Original variables CSV file path updated
+# write.csv(df, "/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/variables.csv", row.names = FALSE)
+```
+
+## Load Data
+
+```{r}
+# Loading the data from the CSV file into a DataFrame
+data <- read.csv("/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/transformed_variables.csv")
+
+# View the first few rows of the data to confirm it's loaded correctly
+head(data)
+```
+
+## Visualizations
+
+### Distribution of Sample Members by Country
+
+```{r}
+ggplot(data, aes(x = jkl_country)) + 
+  geom_bar() + 
+  labs(title = "Distribution of Sample Members by Country", x = "Country", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Most of the respondents in this study are from England.
+
+### Distribution of Members by Region
+
+```{r}
+ggplot(data, aes(x = jkl_gor_dv)) +
+  geom_bar() +
+  labs(
+    title = "Distribution of Members by Region",
+    x = "Region",
+    y = "Count"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The South East, London, North west and Scotland were the regions that recorded the most respondents.
+
+The North East had a significantly lower number of respondents.
+
+### Employment Status Distribution
+
+```{r}
+# Calculate percentages for the employment status
+employment_status <- data %>%
+  count(jkl_jbstat) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+employment_status
+
+ggplot(data, aes(x = "", fill = jkl_jbstat)) + 
+  geom_bar(width = 1) + 
+  coord_polar(theta = "y") + 
+  labs(title = "Employment Status Distribution", x = NULL, y = NULL, fill = "Employment Status") +
+  theme_void() +
+  theme(legend.title = element_text(size = 12), legend.text = element_text(size = 10))
+```
+
+42% of the respondents are retired whilst 39% of them are in paid employment. Other categories like long-term sickness or disability, family care, and being a student represent smaller but notable percentages of the whole data set.
+
+```{r}
+ggplot(data, aes(x = jkl_tenure_dv)) + 
+  geom_bar(fill = "steelblue") + 
+  labs(title = "Housing Tenure of Respondents", x = "Housing Tenure", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+A significant proportion of the population in this data set own their homes.
+
+## Data Exploration and Feature Engineering
+
+### Numerical Variables: Income Distributions
+
+```{r}
+numeric_variables <- c("jkl_fimnnet_dv", "jkl_fihhmnnet1_dv")
+summary_statistics_list <- list()
+
+for (var in numeric_variables) {
+  summary_statistics <- data %>%
+    summarise(
+      Mean = mean(.data[[var]], na.rm = TRUE),
+      Median = median(.data[[var]], na.rm = TRUE),
+      StdDev = sd(.data[[var]], na.rm = TRUE),
+      Min = min(.data[[var]], na.rm = TRUE),
+      Max = max(.data[[var]], na.rm = TRUE)
+    )
+  
+  print(paste("Summary statistics for", var))
+  print(summary_statistics)
+  
+  summary_statistics_list[[var]] <- summary_statistics
+  
+  hist_plot <- ggplot(data, aes(x = !!sym(var))) +
+    geom_histogram(binwidth = 100, fill = 'blue') +
+    labs(title = paste('Histogram of', var), x = var, y = 'Count') +
+    scale_x_continuous(limits = c(0, 30000))  # Adjust the limits as needed
+  
+  print(hist_plot)
+}
+
+```
+
+The mean total net personal income (jkl_fimnnet_dv) and the mean household income (jkl_fihhmnnet1_dv) are higher than their medians. This indicates that the distribution might be right-skewed. Incomes on the higher end are pulling the mean upwards.
+
+The large standard deviation (1596.673) relative to the mean suggests there is significant variation in the total net personal income and household income levels.
+
+The income range is very wide, from -5589.49 to 102890.9 for the total net personal income and from -3306.16 to 104318.9 for the household income. This wide range indicates significant disparities in the dataset, with some individuals having very high incomes and others experiencing losses or debts. It also shows that the dataset has extreme values or outliers. There is a diverse set of incomes, including some cases of significant financial difficulties and some cases of substantial wealth.
+
+### Calculating Correlation
+
+```{r}
+correlation_matrix <- data %>%
+  select(all_of(numeric_variables)) %>% 
+  cor(use = "complete.obs")
+
+print(correlation_matrix)
+```
+
+There is a moderate to strong positive relationship between personal incomes and household incomes. The relationship is strong enough to suggest that higher personal incomes are associated with higher household incomes.
+
+### Categorical Variables
+
+```{r}
+categorical_variables <- c("jkl_country", "jkl_gor_dv", "jkl_urban_dv", "jkl_sex_dv",
+                           "jkl_mastat_dv", "jkl_jbstat", "jkl_ethn_dv", "bornuk_dv",
+                           "jkl_jbsoc00_cc", "jkl_jbnssec8_dv", "jkl_jbnssec5_dv",
+                           "jkl_jbnssec3_dv", "jkl_health", "jkl_nkids_dv", "jkl_hhtype_dv",
+                           "jkl_tenure_dv")
+
+data_factors <- data %>%
+  mutate(across(all_of(categorical_variables), factor))
+
+for (var in categorical_variables) {
+  cat("\nFrequency table for", var, ":\n")
+  frequency_counts <- table(data_factors[[var]])
+  print(frequency_counts)
+  
+  proportions <- prop.table(frequency_counts)
+  cat("\nProportions for", var, ":\n")
+  print(proportions)
+  
+  bar_plot <- ggplot(data_factors, aes(x = !!sym(var))) +
+    geom_bar() +
+    labs(title = paste("Distribution of", var), x = var, y = "Count") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(bar_plot)
+}
+
+cat_vars_summary <- summary(data_factors)
+print(cat_vars_summary)
+```
+
+Participants are mainly from England but Northern Ireland, Scotland and Wales were also represented. Most participants were from urban areas. They were more than double those from rural areas. Female participants were the majority although not by a huge difference. Most participants are married. A significant number are divorced, living as a couple single and never married/in civil partnership and widowed. Majority of the participants are either retired or in paid employment. Most participants are British/ English/ Scottish/ Welsh/ Northern Irish. Other races were barely represented. Majority of the respondents were born in the UK. Most respondents had no long standing illness.
+
+The variable jkl_jbsoc00_cc was unclear, so an alternative chart was created. The variables jkl_jbnssec8_dv, jkl_jbnssec5_dv, and jkl_jbnssec3_dv showed that most respondents marked their profession as inapplicable. Therefore, the following plots were created, excluding the inapplicable category from these variables.
+
+```{r}
+# Calculate percentages for the job info
+jobinfo <- data %>%
+  count(jkl_jbsoc00_cc) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+jobinfo
+
+# Filter out the 'inapplicable' category
+filtered_data <- data %>%
+  filter(jkl_jbsoc00_cc != "inapplicable")
+
+# Calculate percentages for the employment status
+job <- filtered_data %>%
+  count(jkl_jbsoc00_cc) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Filter the top 20 categories by percentage
+top_20_job <- job %>%
+  arrange(desc(percentage)) %>%
+  slice_head(n = 20)
+
+# Plot the top 20 categories
+top_20_plot <- ggplot(top_20_job, aes(x = reorder(jkl_jbsoc00_cc, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = 'blue') +
+  labs(title = 'Top 20 Employment Status Categories', x = 'Employment Status', y = 'Percentage') +
+  coord_flip() +
+  theme_minimal()
+
+# Print the plot
+print(top_20_plot)
+```
+
+The largest group of respondents falls under "Lower management & professional," comprising just under 30%. "Semi-routine," "Intermediate," "Small employers & own account," "Higher professional," and "Routine" categories each account for a smaller but still significant proportion of the respondents."Lower supervisory & technical," "Large employers & higher management," and "Missing" categories represent the smallest percentages, each below 10%. This distribution highlights the predominance of lower management and professional roles among respondents, with a diverse spread across other employment statuses.
+
+```{r}
+# Filter out the 'inapplicable' category
+filtered_data1 <- data %>%
+  filter(jkl_jbnssec8_dv != "inapplicable")
+
+# Calculate percentages for the employment status
+sec <- filtered_data1 %>%
+  count(jkl_jbnssec8_dv) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Check the 'sec' data frame
+print("SEC data frame after calculating percentages:")
+print(sec)
+
+# Plot the categories
+sec_plot <- ggplot(sec, aes(x = reorder(jkl_jbnssec8_dv, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = 'blue') +
+  labs(
+    title = "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) eight-class model",
+    x = 'Employment Status', 
+    y = 'Percentage'
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+# Print the plot
+print(sec_plot)
+```
+
+When looking at the "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) eight-class model", the largest group of respondents have "Management & professional" as their employment status. They comprise of just under 45% of the total respondents. "Semi-routine & Routine" represents just above 20% of the population. "Intermediate" accounts for just below 15 % of the total population. "Small employers & own account" represents close to 10% of the population. Whereas "Lower supervisory & technical," and the "Missing" categories represent the smallest percentages, each below 10%. This distribution indicates that a substantial portion of the respondents occupy lower management and professional roles, while fewer are in higher management or supervisory positions.
+
+```{r}
+# Filter out the 'inapplicable' category
+filtered_data2 <- data %>%
+  filter(jkl_jbnssec5_dv != "inapplicable")
+
+# Calculate percentages for the employment status
+sec5 <- filtered_data2 %>%
+  count(jkl_jbnssec5_dv) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Check the 'sec' data frame
+print("Simple SEC data frame after calculating percentages:")
+print(sec5)
+
+# Plot the categories
+sec_plot5 <- ggplot(sec5, aes(x = reorder(jkl_jbnssec5_dv, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = 'blue') +
+  labs(
+    title = "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) five-class model",
+    x = 'Employment Status', 
+    y = 'Percentage'
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+# Print the plot
+print(sec_plot5)
+```
+
+Based on the National Statistics Socio-economic Classification (NS-SEC) five-class model, most respondents' current jobs are categorized as "Lower management & professional," making up nearly 30% of the total. This is followed by "Semi-routine" and "Routine" jobs, which together account for just over 20%. The "Intermediate" category includes just under 15% of the respondents. About 10% of the population falls under "Small employers & own account." The "Lower supervisory & technical" and "Missing" categories have the smallest representation, each below 10%. This indicates a significant concentration of respondents in professional and management roles, with fewer in supervisory or technical positions.
+
+```{r}
+# Filter out the 'inapplicable' category
+filtered_data3 <- data %>%
+  filter(jkl_jbnssec3_dv != "inapplicable")
+
+# Calculate percentages for the employment status
+sec3 <- filtered_data3 %>%
+  count(jkl_jbnssec3_dv) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Check the 'sec' data frame
+print("Simple SEC data frame after calculating percentages:")
+print(sec3)
+
+# Plot the categories
+sec_plot3 <- ggplot(sec3, aes(x = reorder(jkl_jbnssec3_dv, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = 'blue') +
+  labs(
+    title = "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) three-class model",
+    x = 'Employment Status', 
+    y = 'Percentage'
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+# Print the plot
+print(sec_plot3)
+
+```
+
+The National Statistics Socio-economic Classification (NS-SEC) three-class model reveals that nearly 45% of the population falls under the "Management & professional" category, making it the largest group. Approximately 30% of respondents are in the "Routine" category, while just over 20% are classified as "Intermediate." The "Missing" category accounts for a small 5% of the population. This distribution highlights a significant concentration of individuals in management and professional roles, with a substantial portion also engaged in routine jobs.
+
+### Key Variable Analysis
+
+```{r}
+names(data)
+```
+
+The variables in this dataset cover a wide range of demographic, socio-economic, and health-related factors.
+
+Variables that showcase demographics include Household Identifiers (jkl_hidp, j_hidp, k_hidp, l_hidp), Country (jkl_country) & Region (jkl_gor_dv) variables and Ethnic Group (jkl_ethn_dv)
+
+#### Household Identifiers
+
+The Household Identifiers (jkl_hidp, j_hidp, k_hidp, l_hidp) are crucial for distinguishing between different households and linking data across different waves. Understanding household dynamics is essential for economic analyses, such as household income distribution and the impact of economic policies on households. By linking personal and household identifiers (pidp, jkl_hidp, j_hidp, k_hidp, l_hidp), researchers can track individual and household economic outcomes over time. This relationship is essential for longitudinal studies to understand how personal and household circumstances change and the impact of economic policies over different periods.
+
+```{r}
+# Check uniqueness of personal identifiers
+unique_pidp <- length(unique(data$pidp)) == nrow(data)
+cat("Are all pidp values unique? ", unique_pidp, "\n")
+
+# Check consistency of household identifiers
+unique_households <- data %>%
+  select(jkl_hidp, j_hidp, k_hidp, l_hidp) %>%
+  unique()
+
+cat("Number of unique households: ", nrow(unique_households), "\n")
+
+# Count the number of individuals per household
+household_size <- data %>%
+  group_by(jkl_hidp) %>%
+  summarise(household_count = n())
+
+# Summary statistics of household sizes
+summary(household_size$household_count)
+
+# Create a frequency table for household sizes
+household_size_freq <- household_size %>%
+  count(household_count) %>%
+  rename(frequency = n)
+
+# Visualize household sizes with a line chart
+ggplot(household_size_freq, aes(x = household_count, y = frequency)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Distribution of Household Sizes", x = "Household Size", y = "Frequency")
+
+```
+
+The chart above reveals that the most common household size is 2 members, with a frequency just over 6000, followed by 3-member households at slightly above 4000. One-member households also have a significant frequency, though less than 3-member households. Household sizes larger than 3 are much less common, with frequencies quickly tapering off, and larger household sizes (4, 5, 6, etc.) have very low frequencies compared to smaller household sizes. These observations imply a greater demand for smaller housing units and tailored public services to accommodate the predominant household sizes.
+
+#### Country (jkl_country) and Region (jkl_gor_dv) variables
+
+The Country (jkl_country) and Region (jkl_gor_dv) variables help to analyze geographic disparities in economic conditions. Different regions may have varying levels of economic development, employment opportunities, and living standards, which are critical for regional policy-making and targeted economic interventions.
+
+#### Urban and rural areas (jkl_urban_dv)
+
+The Urban and rural areas that is showcased by (jkl_urban_dv) often have different economic structures. Urban areas might have more diverse job opportunities and higher living costs, while rural areas might face challenges like limited access to services and employment. This variable is essential for understanding these differences and tailoring economic policies accordingly.
+
+#### Sex (jkl_sex_dv)
+
+The Sex (derived) (jkl_sex_dv) variable highlights economic disparities between genders. Women often earn less than men due to the gender wage gap and face discrimination in hiring and promotions. They have less access to high-paying STEM fields and professional networks. Additionally, family responsibilities often lead to career interruptions and part-time work for women. Addressing these issues through targeted policies and workplace reforms is crucial for promoting gender equality and reducing economic disparities.
+
+#### Ethnic Group (jkl_ethn_dv)
+
+Ethnic Group (jkl_ethn_dv) can influence economic opportunities and outcomes due to factors like discrimination, social networks, and access to education. This variable is important for understanding and addressing economic disparities among different ethnic groups.
+
+#### Employment Status (jkl_jbstat)
+
+Employment Status (jkl_jbstat) is directly linked to income levels, economic stability, and overall well-being. Analyzing employment status can provide insights into labor market trends, unemployment rates, and the effectiveness of job creation programs.
+
+The plots below showcase how employment status varies accross different demographics represented in the study.
+
+```{r}
+key_variable <- "jkl_jbstat"
+variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
+
+for (var in variables_to_pair){count_table <- table(data_factors[[key_variable]], data_factors[[var]])
+  
+  prop_table <- prop.table(count_table, 1)
+  prop_df <- as.data.frame(prop_table)
+  
+  names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
+  
+  plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
+    geom_bar(stat = "identity", position = "fill") +
+    geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+    labs(title = paste("Proportion of", var, "within", key_variable),
+         x = key_variable, y = "Proportion") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(plot)}
+```
+
+```{r}
+# Calculate the proportions
+data_proportion <- data %>%
+  group_by(jkl_gor_dv, jkl_jbstat) %>%
+  summarise(count = n()) %>%
+  mutate(proportion = count / sum(count))
+
+# Create the stacked bar chart
+ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = jkl_jbstat)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal() +
+  labs(
+    title = "Proportion of Employment Status within Regions in the UK",
+    x = "Region",
+    y = "Proportion",
+    fill = "Employment Status"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+```{r}
+# Change "Yorkshire and the Humber" to "Yorkshire and The Humber" to match the map 
+data <- data %>%
+  mutate(jkl_gor_dv = ifelse(jkl_gor_dv == "Yorkshire and the Humber", "Yorkshire and The Humber", jkl_gor_dv))
+
+# Define the path to the shapefile
+shapefile_path <- "/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/RGN_DEC_2021_EN_BGC.shp"
+
+# Read the shapefile
+uk_shapefile <- st_read(shapefile_path)
+
+# Simplify the geometry
+uk_shapefile_simplified <- ms_simplify(uk_shapefile, keep = 0.01) 
+
+# Unique values in the shapefile
+cat("Unique values in shapefile (RGN21NM):\n")
+print(unique(uk_shapefile_simplified$RGN21NM))
+
+# Unique values in your data
+cat("Unique values in data (jkl_gor_dv):\n")
+print(unique(data$jkl_gor_dv))
+
+# Inspect column names in the shapefile
+cat("Column names in the shapefile:\n")
+print(names(uk_shapefile_simplified))
+
+# Inspect column names in your data
+cat("Column names in your data:\n")
+print(names(data))
+
+# Define the regions present in the shapefile
+regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+
+# Filter the data to include only the regions present in the shapefile
+filtered_data <- data %>%
+  filter(jkl_gor_dv %in% regions_in_shapefile)
+
+# Merge simplified shapefile with the filtered data
+uk_data_filtered <- uk_shapefile_simplified %>%
+  left_join(filtered_data, by = c("RGN21NM" = "jkl_gor_dv"))
+
+# Plot the map
+ggplot(data = uk_data_filtered) +
+  geom_sf(aes(fill = jkl_jbstat)) +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(
+    title = "Employment Status in Different Regions in the UK",
+    fill = "Employment Status"
+  )
+```
+
+```{r}
+# Summarize the data to get proportions
+data_summary <- data %>%
+  group_by(jkl_jbstat, jkl_ethn_dv) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  mutate(proportion = count / sum(count))
+
+#Long format for pie chart 
+data_long <- data_summary %>%
+  select(jkl_jbstat, jkl_ethn_dv, proportion)
+
+# Get unique categories of jkl_jbstat
+categories <- unique(data_long$jkl_jbstat)
+
+# Generate and print pie charts for each category
+for (category in categories) {
+  plot_data <- data_long %>% filter(jkl_jbstat == category)
+  
+  p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+    geom_bar(width = 1, stat = "identity") +
+    coord_polar("y", start = 0) +
+    theme_minimal(base_size = 15) +
+    labs(title = paste("Proportion of jkl_ethn_dv within", category),
+         fill = "Ethnic Group",
+         y = "Proportion",
+         x = "") +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(size = 16)
+    )
+  
+  # Print the plot
+  print(p)
+}
+
+```
+
+#### Socio-economic Classification
+
+Standard Socio-economic Classification (SOC) (jkl_jbsoc00_cc, jkl_jbnssec8_dv, jkl_jbnssec5_dv, jkl_jbnssec3_dv) provide a detailed look at occupational status and social class. They are crucial for studying social mobility, occupational earnings, and the impact of economic policies on different socio-economic groups.
+
+```{r}
+key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
+variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
+
+for (key_variable in key_variables) {
+  for (var in variables_to_pair) {
+    count_table <- table(data_factors[[key_variable]], data_factors[[var]])
+    
+    prop_table <- prop.table(count_table, 1)
+    prop_df <- as.data.frame(prop_table)
+    
+    names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
+    
+    plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
+      geom_bar(stat = "identity", position = "fill") +
+      geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+      labs(title = paste("Proportion of", var, "within", key_variable),
+           x = key_variable, y = "Proportion") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+    print(plot)
+  }
+}
+```
+
+```{r}
+# List of key variables
+key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Filter out 'inapplicable' category and calculate the proportions
+  data_proportion <- data %>%
+    filter(!!sym(key_variable) != "inapplicable") %>%
+    group_by(jkl_gor_dv, !!sym(key_variable)) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  # Create the stacked bar chart
+  plot <- ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = !!sym(key_variable))) +
+    geom_bar(stat = "identity", position = "fill") +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "within Regions in the UK"),
+      x = "Region",
+      y = "Proportion",
+      fill = key_variable
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+```{r}
+# List of key variables
+key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
+
+# Print unique values and column names for debugging
+cat("Unique values in shapefile (RGN21NM):\n")
+print(unique(uk_shapefile_simplified$RGN21NM))
+
+cat("Unique values in data (jkl_gor_dv):\n")
+print(unique(data$jkl_gor_dv))
+
+cat("Column names in the shapefile:\n")
+print(names(uk_shapefile_simplified))
+
+cat("Column names in your data:\n")
+print(names(data))
+
+# Define the regions present in the shapefile
+regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+
+# Filter the data to include only the regions present in the shapefile
+filtered_data <- data %>%
+  filter(jkl_gor_dv %in% regions_in_shapefile)
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Remove 'inapplicable' category
+  filtered_data_variable <- filtered_data %>%
+    filter(!!sym(key_variable) != "inapplicable")
+  
+  # Merge simplified shapefile with the filtered data for the current key variable
+  uk_data_filtered <- uk_shapefile_simplified %>%
+    left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
+  
+  # Plot the map for the current key variable
+  plot <- ggplot(data = uk_data_filtered) +
+    geom_sf(aes_string(fill = key_variable)) +
+    scale_fill_viridis_d() +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
+      fill = key_variable
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+##### 
+
+```{r}
+# List of key variables for pie charts
+key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Summarize the data to get proportions
+  data_summary <- data %>%
+    group_by(!!sym(key_variable), jkl_ethn_dv) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  # Long format for pie chart 
+  data_long <- data_summary %>%
+    select(!!sym(key_variable), jkl_ethn_dv, proportion)
+  
+  # Get unique categories of the current key variable
+  categories <- unique(data_long[[key_variable]])
+  
+  # Generate and print pie charts for each category
+  for (category in categories) {
+    plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
+    
+    p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+      geom_bar(width = 1, stat = "identity") +
+      coord_polar("y", start = 0) +
+      theme_minimal(base_size = 15) +
+      labs(
+        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
+        fill = "Ethnic Group",
+        y = "Proportion",
+        x = ""
+      ) +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 16)
+      )
+    
+    # Print the plot
+    print(p)
+  }
+}
+
+```
+
+#### Health and Well-being
+
+Health and Well-being (jkl_health) show how health status significantly affects economic productivity and quality of life. Poor health can lead to increased healthcare costs and reduced labor market participation. These variables are essential for understanding the economic impact of health and designing health-related economic policies.
+
+```{r}
+key_variable <- "jkl_health"
+variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
+
+for (var in variables_to_pair) {
+  count_table <- table(data_factors[[key_variable]], data_factors[[var]])
+  
+  prop_table <- prop.table(count_table, 1)
+  prop_df <- as.data.frame(prop_table)
+  
+  names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
+  
+  plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
+    geom_bar(stat = "identity", position = "fill") +
+    geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+    labs(title = paste("Proportion of", var, "within", key_variable),
+         x = key_variable, y = "Proportion") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(plot)
+}
+```
+
+```{r}
+# List of key variables
+key_variables <- "jkl_health"
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Filter out 'inapplicable' category and calculate the proportions
+  data_proportion <- data %>%
+    filter(!!sym(key_variable) != "inapplicable") %>%
+    group_by(jkl_gor_dv, !!sym(key_variable)) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  # Create the stacked bar chart
+  plot <- ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = !!sym(key_variable))) +
+    geom_bar(stat = "identity", position = "fill") +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "within Regions in the UK"),
+      x = "Region",
+      y = "Proportion",
+      fill = key_variable
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  # Print the plot
+  print(plot)
+}
+```
+
+```{r}
+# List of key variables
+key_variables <- "jkl_health"
+
+# Print unique values and column names for debugging
+cat("Unique values in shapefile (RGN21NM):\n")
+print(unique(uk_shapefile_simplified$RGN21NM))
+
+cat("Unique values in data (jkl_gor_dv):\n")
+print(unique(data$jkl_gor_dv))
+
+cat("Column names in the shapefile:\n")
+print(names(uk_shapefile_simplified))
+
+cat("Column names in your data:\n")
+print(names(data))
+
+# Define the regions present in the shapefile
+regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+
+# Filter the data to include only the regions present in the shapefile
+filtered_data <- data %>%
+  filter(jkl_gor_dv %in% regions_in_shapefile)
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Remove 'inapplicable' category
+  filtered_data_variable <- filtered_data %>%
+    filter(!!sym(key_variable) != "inapplicable")
+  
+  # Merge simplified shapefile with the filtered data for the current key variable
+  uk_data_filtered <- uk_shapefile_simplified %>%
+    left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
+  
+  # Plot the map for the current key variable
+  plot <- ggplot(data = uk_data_filtered) +
+    geom_sf(aes_string(fill = key_variable)) +
+    scale_fill_viridis_d() +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
+      fill = key_variable
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+```{r}
+# List of key variables for pie charts
+key_variables <- "jkl_health"
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Summarize the data to get proportions
+  data_summary <- data %>%
+    group_by(!!sym(key_variable), jkl_ethn_dv) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  # Long format for pie chart 
+  data_long <- data_summary %>%
+    select(!!sym(key_variable), jkl_ethn_dv, proportion)
+  
+  # Get unique categories of the current key variable
+  categories <- unique(data_long[[key_variable]])
+  
+  # Generate and print pie charts for each category
+  for (category in categories) {
+    plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
+    
+    p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+      geom_bar(width = 1, stat = "identity") +
+      coord_polar("y", start = 0) +
+      theme_minimal(base_size = 15) +
+      labs(
+        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
+        fill = "Ethnic Group",
+        y = "Proportion",
+        x = ""
+      ) +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 16)
+      )
+    
+    # Print the plot
+    print(p)
+  }
+}
+
+```
+
+#### Household Composition and Size & Housing Tenure
+
+Household Composition and Size (jkl_hhsize, jkl_nkids_dv, jkl_hhtype_dv) affects economic needs and consumption patterns. Larger households or those with more children may have different financial pressures compared to smaller households. These variables help in analyzing the economic needs of different household types.
+
+Housing Tenure (jkl_tenure_dv), which show whether renting or owning affects household expenditure, wealth accumulation, and financial stability. This variable is important for studying housing market trends and the impact of housing policies.
+
+```{r}
+key_variable <- "jkl_tenure_dv"
+variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
+
+for (var in variables_to_pair) {
+  count_table <- table(data_factors[[key_variable]], data_factors[[var]])
+  
+  prop_table <- prop.table(count_table, 1)
+  prop_df <- as.data.frame(prop_table)
+  
+  names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
+  
+  plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
+    geom_bar(stat = "identity", position = "fill") +
+    geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+    labs(title = paste("Proportion of", var, "within", key_variable),
+         x = key_variable, y = "Proportion") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(plot)
+}
+```
+
+```{r}
+# List of key variables
+key_variables <- "jkl_tenure_dv"
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Filter out 'inapplicable' category and calculate the proportions
+  data_proportion <- data %>%
+    filter(!!sym(key_variable) != "inapplicable") %>%
+    group_by(jkl_gor_dv, !!sym(key_variable)) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  # Create the stacked bar chart
+  plot <- ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = !!sym(key_variable))) +
+    geom_bar(stat = "identity", position = "fill") +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "within Regions in the UK"),
+      x = "Region",
+      y = "Proportion",
+      fill = key_variable
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+```{r}
+# List of key variables
+key_variables <- "jkl_tenure_dv"
+
+# Print unique values and column names for debugging
+cat("Unique values in shapefile (RGN21NM):\n")
+print(unique(uk_shapefile_simplified$RGN21NM))
+
+cat("Unique values in data (jkl_gor_dv):\n")
+print(unique(data$jkl_gor_dv))
+
+cat("Column names in the shapefile:\n")
+print(names(uk_shapefile_simplified))
+
+cat("Column names in your data:\n")
+print(names(data))
+
+# Define the regions present in the shapefile
+regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+
+# Filter the data to include only the regions present in the shapefile
+filtered_data <- data %>%
+  filter(jkl_gor_dv %in% regions_in_shapefile)
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Remove 'inapplicable' category
+  filtered_data_variable <- filtered_data %>%
+    filter(!!sym(key_variable) != "inapplicable")
+  
+  # Merge simplified shapefile with the filtered data for the current key variable
+  uk_data_filtered <- uk_shapefile_simplified %>%
+    left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
+  
+  # Plot the map for the current key variable
+  plot <- ggplot(data = uk_data_filtered) +
+    geom_sf(aes_string(fill = key_variable)) +
+    scale_fill_viridis_d() +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
+      fill = key_variable
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+```{r}
+
+# List of key variables for pie charts
+key_variables <- "jkl_tenure_dv"
+
+# Loop over each key variable
+for (key_variable in key_variables) {
+  # Summarize the data to get proportions
+  data_summary <- data %>%
+    group_by(!!sym(key_variable), jkl_ethn_dv) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(proportion = count / sum(count))
+  
+  #Long format for pie chart 
+  data_long <- data_summary %>%
+    select(!!sym(key_variable), jkl_ethn_dv, proportion)
+  
+  # Get unique categories of the current key variable
+  categories <- unique(data_long[[key_variable]])
+  
+  # Generate and print pie charts for each category
+  for (category in categories) {
+    plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
+    
+    p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+      geom_bar(width = 1, stat = "identity") +
+      coord_polar("y", start = 0) +
+      theme_minimal(base_size = 15) +
+      labs(
+        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
+        fill = "Ethnic Group",
+        y = "Proportion",
+        x = ""
+      ) +
+      theme(
+        axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 16)
+      )
+    
+    # Print the plot
+    print(p)
+  }
+}
+
+```
+
+#### Household Income
+
+Net Household Monthly Income (jkl_fihhmnnet1_dv) is a critical measure of economic well-being. It influences consumption, savings, and investment decisions. Analyzing household income helps in understanding economic inequality and the standard of living.
+
+```{r}
+key_variable <- "jkl_fihhmnnet1_dv"
+variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
+
+for (var in variables_to_pair) {
+  if (!(var %in% names(data_factors))) {
+    warning(paste("The variable", var, "is not present in data_factors. Skipping."))
+    next
+  }
+  
+  plot <- ggplot(data_factors, aes_string(x = var, y = key_variable, fill = var)) +
+    geom_boxplot() +
+    geom_hline(yintercept = median(data_factors[[key_variable]], na.rm = TRUE), linetype = "dashed", color = "red") +
+    labs(title = paste("Distribution of", key_variable, "across", var),
+         x = var, y = "Net Household Monthly Income") +
+    ylim(0, 12500) +  # Set the y-axis limit
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Print plot to the R console
+  print(plot)
+}
+```
+
+```{r}
+# Define the numerical key variable
+key_variable <- "jkl_fihhmnnet1_dv"
+
+# Print unique values and column names for debugging
+cat("Unique values in shapefile (RGN21NM):\n")
+print(unique(uk_shapefile_simplified$RGN21NM))
+
+cat("Unique values in data (jkl_gor_dv):\n")
+print(unique(data$jkl_gor_dv))
+
+cat("Column names in the shapefile:\n")
+print(names(uk_shapefile_simplified))
+
+cat("Column names in your data:\n")
+print(names(data))
+
+# Define the regions present in the shapefile
+regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+
+# Filter the data to include only the regions present in the shapefile
+filtered_data <- data %>%
+  filter(jkl_gor_dv %in% regions_in_shapefile)
+
+# Bin the numerical variable into categories
+filtered_data <- filtered_data %>%
+  mutate(income_bin = cut(
+    !!sym(key_variable),
+    breaks = c(-Inf, 1000, 2000, 3000, 4000, 5000, Inf),
+    labels = c("<=1000", "1001-2000", "2001-3000", "3001-4000", "4001-5000", ">5000"),
+    right = FALSE
+  ))
+
+# Summarize the data to get proportions
+data_summary <- filtered_data %>%
+  group_by(jkl_gor_dv, income_bin) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  mutate(proportion = count / sum(count))
+
+# Merge simplified shapefile with the filtered data
+uk_data_filtered <- uk_shapefile_simplified %>%
+  left_join(data_summary, by = c("RGN21NM" = "jkl_gor_dv"))
+
+# Plot the map for each income bin
+for (bin in unique(uk_data_filtered$income_bin)) {
+  plot_data <- uk_data_filtered %>%
+    filter(income_bin == bin)
+  
+  plot <- ggplot(data = plot_data) +
+    geom_sf(aes(fill = proportion)) +
+    scale_fill_viridis_c() +
+    theme_minimal() +
+    labs(
+      title = paste("Proportion of Income Bin", bin, "in Different Regions in the UK"),
+      fill = "Proportion"
+    )
+  
+  # Print the plot
+  print(plot)
+}
+
+```
+
+```{r}
+# Define the numerical key variable
+key_variable <- "jkl_fihhmnnet1_dv"
+
+# Bin the numerical variable into categories
+data <- data %>%
+  mutate(income_bin = cut(
+    !!sym(key_variable),
+    breaks = c(-Inf, 1000, 2000, 3000, 4000, 5000, Inf),
+    labels = c("<=1000", "1001-2000", "2001-3000", "3001-4000", "4001-5000", ">5000"),
+    right = FALSE
+  ))
+
+# Summarize the data to get proportions
+data_summary <- data %>%
+  group_by(income_bin, jkl_ethn_dv) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  mutate(proportion = count / sum(count))
+
+#Long format for pie chart 
+data_long <- data_summary %>%
+  select(income_bin, jkl_ethn_dv, proportion)
+
+# Get unique categories of the binned income
+categories <- unique(data_long$income_bin)
+
+# Generate and print pie charts for each category
+for (category in categories) {
+  plot_data <- data_long %>% filter(income_bin == category)
+  
+  p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+    geom_bar(width = 1, stat = "identity") +
+    coord_polar("y", start = 0) +
+    theme_minimal(base_size = 15) +
+    labs(
+      title = paste("Proportion of jkl_ethn_dv within Income Bin", category),
+      fill = "Ethnic Group",
+      y = "Proportion",
+      x = ""
+    ) +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(size = 16)
+    )
+  
+  # Print the plot
+  print(p)
+}
+
+```
+
+#### Variable interactions
+
+Understanding the relationships between these variables can provide deeper insights into various economic phenomena. Therefore, it is crucial to understand the potential relationships and their economic implications.
+
+##### Country and Region, Employment Status and Income
+
+Analyzing the relationships between Country and Region variables (jkl_country, jkl_gor_dv) with Employment Status (jkl_jbstat) and Income variables (jkl_fimnnet_dv, jkl_fimnlabnet_dv, jkl_fihhmnnet1_dv) can reveal geographic disparities in employment opportunities and income levels. For instance, some regions may have higher unemployment rates and lower income levels, indicating the need for regional economic development programs or targeted employment policies.
+
+###### England
+
+```{r}
+# Filter data for England
+england_data <- data %>%
+  filter(jkl_country == "England")
+
+# Divide the categories into two subsets
+categories <- unique(england_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+england_data_1 <- england_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+england_data_2 <- england_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(england_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in England (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 110000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(england_data_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in England (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- england_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Northern Ireland
+
+```{r}
+# Filter data 
+Northern_Ireland_data <- data %>%
+  filter(jkl_country == "Northern Ireland")
+
+# Divide the categories into two subsets
+categories <- unique(Northern_Ireland_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Northern_Ireland_data_1 <- Northern_Ireland_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Northern_Ireland_2 <- Northern_Ireland_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Northern_Ireland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Northern Ireland (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Northern_Ireland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Northern Ireland (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- Northern_Ireland_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Scotland
+
+```{r}
+# Filter data 
+Scotland_data <- data %>%
+  filter(jkl_country == "Scotland")
+
+# Divide the categories into two subsets
+categories <- unique(Scotland_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Scotland_data_1 <- Scotland_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Scotland_2 <- Scotland_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Scotland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Scotland (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Scotland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Scotland (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- Scotland_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Wales
+
+```{r}
+# Filter data 
+Wales_data <- data %>%
+  filter(jkl_country == "Wales")
+
+# Divide the categories into two subsets
+categories <- unique(Wales_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Wales_data_1 <- Wales_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Wales_2 <- Wales_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Wales_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Wales (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Wales_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Wales (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- Wales_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### North East
+
+```{r}
+# Filter data 
+North_East_data <- data %>%
+  filter(jkl_gor_dv == "North East")
+
+# Divide the categories into two subsets
+categories <- unique(North_East_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+North_East_data_1 <- North_East_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+North_East_2 <- North_East_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(North_East_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in North East (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(North_East_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in North East (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- North_East_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### West Midlands
+
+```{r}
+# Filter data 
+West_Midlands_data <- data %>%
+  filter(jkl_gor_dv == "West Midlands")
+
+# Divide the categories into two subsets
+categories <- unique(West_Midlands_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+West_Midlands_data_1 <- West_Midlands_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+West_Midlands_2 <- West_Midlands_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(West_Midlands_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in West Midlands (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(West_Midlands_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in West Midlands (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+# Calculate summary statistics
+summary_statistics <- West_Midlands_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### North West
+
+```{r}
+# Filter data 
+North_West_data <- data %>%
+  filter(jkl_gor_dv == "North West")
+
+# Divide the categories into two subsets
+categories <- unique(North_West_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+North_West_data_1 <- North_West_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+North_West_2 <- North_West_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(North_West_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in North West (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(North_West_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in North West (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <- North_West_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Yorkshire and The Humber
+
+```{r}
+# Filter data 
+Yorkshire_and_The_Humber_data <- data %>%
+  filter(jkl_gor_dv == "Yorkshire and The Humber")
+
+# Divide the categories into two subsets
+categories <- unique(Yorkshire_and_The_Humber_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Yorkshire_and_The_Humber_data_1 <- Yorkshire_and_The_Humber_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Yorkshire_and_The_Humber_2 <- Yorkshire_and_The_Humber_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Yorkshire_and_The_Humber_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Yorkshire and The Humber (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Yorkshire_and_The_Humber_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Yorkshire and The Humber (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <- Yorkshire_and_The_Humber_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Scotland
+
+```{r}
+# Filter data 
+Scotland_data <- data %>%
+  filter(jkl_gor_dv == "Scotland")
+
+# Divide the categories into two subsets
+categories <- unique(Scotland_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Scotland_data_1 <- Scotland_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Scotland_2 <- Scotland_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Scotland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  Scotland (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Scotland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Scotland (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-Scotland_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### East Midlands
+
+```{r}
+# Filter data 
+East_Midlands_data <- data %>%
+  filter(jkl_gor_dv == "East Midlands")
+
+# Divide the categories into two subsets
+categories <- unique(East_Midlands_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+East_Midlands_data_1 <- East_Midlands_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+East_Midlands_2 <- East_Midlands_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(East_Midlands_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  East Midlands (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(East_Midlands_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in East Midlands (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 15000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-East_Midlands_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### London
+
+```{r}
+# Filter data 
+London_data <- data %>%
+  filter(jkl_gor_dv == "London")
+
+# Divide the categories into two subsets
+categories <- unique(London_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+London_data_1 <- London_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+London_2 <- London_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(London_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  London (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(London_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in London (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-London_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### South East
+
+```{r}
+# Filter data 
+South_East_data <- data %>%
+  filter(jkl_gor_dv == "South East")
+
+# Divide the categories into two subsets
+categories <- unique(South_East_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+South_East_data_1 <- South_East_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+South_East_2 <- South_East_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(South_East_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  South East (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(South_East_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in South East (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 50000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-South_East_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### South West
+
+```{r}
+# Filter data 
+South_West_data <- data %>%
+  filter(jkl_gor_dv == "South West")
+
+# Divide the categories into two subsets
+categories <- unique(South_West_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+South_West_data_1 <- South_West_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+South_West_2 <- South_West_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(South_West_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  South West (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(South_West_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in South West (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-South_West_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### East of England
+
+```{r}
+# Filter data 
+East_of_England_data <- data %>%
+  filter(jkl_gor_dv == "East of England")
+
+# Divide the categories into two subsets
+categories <- unique(East_of_England_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+East_of_England_data_1 <- East_of_England_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+East_of_England_2 <- East_of_England_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(East_of_England_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  East of England (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(East_of_England_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in East of England (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 30000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-East_of_England_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Wales
+
+```{r}
+# Filter data 
+Wales_data <- data %>%
+  filter(jkl_gor_dv == "Wales")
+
+# Divide the categories into two subsets
+categories <- unique(Wales_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Wales_data_1 <- Wales_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Wales_2 <- Wales_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Wales_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  Wales (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Wales_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Wales (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-Wales_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+###### Northern Ireland
+
+```{r}
+# Filter data 
+Northern_Ireland_data <- data %>%
+  filter(jkl_gor_dv == "Northern Ireland")
+
+# Divide the categories into two subsets
+categories <- unique(Northern_Ireland_data$jkl_jbstat)
+half <- ceiling(length(categories) / 2)
+categories_1 <- categories[1:half]
+categories_2 <- categories[(half + 1):length(categories)]
+
+# Subset data
+Northern_Ireland_data_1 <- Northern_Ireland_data %>%
+  filter(jkl_jbstat %in% categories_1)
+
+Northern_Ireland_2 <- Northern_Ireland_data %>%
+  filter(jkl_jbstat %in% categories_2)
+
+# Generate the first box plot
+plot1 <- ggplot(Northern_Ireland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in  Northern Ireland (Part 1)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 40000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Generate the second box plot
+plot2 <- ggplot(Northern_Ireland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
+  geom_boxplot() +
+  labs(
+    title = 'Income Distribution by Employment Status in Northern Ireland (Part 2)',
+    x = 'Employment Status',
+    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    fill = 'Employment Status'
+  ) +
+  scale_y_continuous(
+    limits = c(0, 20000), 
+    breaks = seq(0, 120000, by = 15000), 
+    labels = scales::comma, 
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
+  )
+
+# Print the plots
+print(plot1)
+print(plot2)
+
+
+# Calculate summary statistics
+summary_statistics <-Northern_Ireland_data %>%
+  group_by(jkl_jbstat) %>%
+  summarise(
+    count = n(),
+    mean = mean(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    median = median(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    sd = sd(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    min = min(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    max = max(jkl_fihhmnnet1_dv, na.rm = TRUE),
+    Q1 = quantile(jkl_fihhmnnet1_dv, 0.25, na.rm = TRUE),
+    Q3 = quantile(jkl_fihhmnnet1_dv, 0.75, na.rm = TRUE)
+  )
+
+# Print the summary statistics
+print(summary_statistics)
+```
+
+##### Urban or Rural Area, Household Composition and Income
+
+Examining the relationship between Urban or Rural Area (jkl_urban_dv) with Household Composition (jkl_hhtype_dv) and Income is also crucial. Urban areas typically have higher living costs but more job opportunities, while rural areas might have lower costs but fewer employment options. Understanding this relationship helps in designing policies that address the unique economic needs of urban and rural households, such as urban housing affordability and rural job creation programs.
+
+```{r}
+# Filter out missing category
+filtered_data <- data %>% filter(jkl_urban_dv != "missing")
+
+# Define the groups for the household composition
+group1 <- c("1 adult under pensionable age, no children", "1 adult, 1 child", "1 adult, 2 or more children")
+group2 <- c("1 female, age 60+, no children", "1 male, aged 65+, no children", "2 adults, not a couple, 1 or more children")
+group3 <- c("2 adults, not a couple, both under pensionable age, no children", "2 adults, not a couple, one or more over pensionable age, no children", "3 or more adults, 1 or more children, excl. any couples")
+group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age,no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
+
+# Create plots for each group
+plot_group <- function(data, group, title) {
+  ggplot(data %>% filter(jkl_hhtype_dv %in% group), 
+         aes(x = jkl_urban_dv, y = jkl_fimnnet_dv, fill = jkl_hhtype_dv)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'Urban or Rural Area (jkl_urban_dv)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Household Composition'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Plotting each group
+plot1 <- plot_group(filtered_data, group1, 'Group 1: Single Adults and Single Parents')
+plot2 <- plot_group(filtered_data, group2, 'Group 2: Older Adults and Non-couple Adults with Children')
+plot3 <- plot_group(filtered_data, group3, 'Group 3: Non-couple Adults and Large Households with Children')
+plot4 <- plot_group(filtered_data, group4, 'Group 4: Couples and Large Households without Children')
+
+# Print the plots
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
+
+```
+
+##### Ethnic Group, Employment Status and Income
+
+The relationship between Ethnic Group (jkl_ethn_dv) and Employment Status and Income helps provide an understanding of how employment status and income vary by ethnic group. This can highlight economic inequalities and potential discrimination in the labor market. This relationship is crucial for developing policies aimed at promoting equal opportunities and reducing economic disparities among different ethnic groups.
+
+```{r}
+# Filter out missing category for ethnic group if needed
+filtered_data <- data %>% filter(jkl_ethn_dv != "missing")
+
+# Define the groups for the ethnic groups and employment statuses
+ethnic_groups <- list(
+  group1 = c("african", "arab", "bangladeshi", "caribbean", "chinese"),
+  group2 = c("any other asian background", "any other black background", "any other ethnic group", "any other mixed background", "any other white background"),
+  group3 = c("british/english/scottish/welsh/northern irish", "gypsy or irish traveller", "indian", "irish", "pakistani"),
+  group4 = c("white and asian", "white and black african", "white and black caribbean")
+)
+
+employment_statuses <- list(
+  group1 = c("Paid employment(ft/pt)", "Self employed"),
+  group2 = c("Unemployed", "Retired"),
+  group3 = c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme"),
+  group4 = c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
+)
+
+# Function to create plots for each combination of ethnic groups and employment statuses
+plot_combination <- function(data, ethnic_group, employment_group, title) {
+  ggplot(data %>% filter(jkl_ethn_dv %in% ethnic_group & jkl_jbstat %in% employment_group), 
+         aes(x = jkl_ethn_dv, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'Ethnic Group (jkl_ethn_dv)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Employment Status'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create a nested loop to generate plots for all combinations
+plot_list <- list()
+plot_number <- 1
+
+for (i in seq_along(ethnic_groups)) {
+  for (j in seq_along(employment_statuses)) {
+    title <- paste('Group', plot_number, ': Ethnic Group', i, 'and Employment Status', j)
+    plot_list[[plot_number]] <- plot_combination(filtered_data, ethnic_groups[[i]], employment_statuses[[j]], title)
+    plot_number <- plot_number + 1
+  }
+}
+
+# Print the plots
+for (plot in plot_list) {
+  print(plot)
+}
+```
+
+##### Socio-economic Classification, Income and Employment Status
+
+The relationships between Socio-economic Classification (jkl_jbsoc00_cc, jkl_jbnssec8_dv, jkl_jbnssec5_dv, jkl_jbnssec3_dv) and Income and Employment Status help to understand how social class and occupational status affect income levels and employment opportunities. Higher socio-economic classes generally have better access to high-paying jobs and economic stability. This information is valuable for assessing social mobility and the effectiveness of policies aimed at reducing economic inequality.
+
+```{r}
+# Filter out missing category for NS-SEC if needed
+filtered_data <- data %>% filter(jkl_jbnssec3_dv != "missing")
+
+# Define the groups for the employment statuses
+group1 <- c("Paid employment(ft/pt)", "Self employed")
+group2 <- c("Unemployed", "Retired")
+group3 <- c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme")
+group4 <- c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
+
+# Create plots for each group
+plot_group <- function(data, group, title) {
+  ggplot(data %>% filter(jkl_jbstat %in% group), 
+         aes(x = jkl_jbnssec3_dv, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'NS-SEC Three-Class (jkl_jbnssec3_dv)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Employment Status'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Plotting each group
+plot1 <- plot_group(filtered_data, group1, 'Group 1: Paid Employment and Self Employed')
+plot2 <- plot_group(filtered_data, group2, 'Group 2: Unemployed and Retired')
+plot3 <- plot_group(filtered_data, group3, 'Group 3: Students, Homemakers, and Others')
+plot4 <- plot_group(filtered_data, group4, 'Group 4: Family Care, Temporarily Laid Off, and Other Inactive')
+
+# Print the plots
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
+```
+
+##### Health and Well-being, Employment Status and Income
+
+The implications of how Health and Well-being (jkl_sf12mcs_dv, jkl_sf12pcs_dv, jkl_health, jkl_scghq1_dv, jkl_scghq2_dv) and Employment Status and Income interact are also eye-opening. Poor health can lead to lower employment rates and income levels due to reduced work capacity and higher healthcare costs. Analyzing these relationships can highlight the economic impact of health issues and the importance of healthcare policies that support economic productivity and well-being.
+
+```{r}
+# Filter out missing category for health status if needed
+filtered_data <- data %>% filter(jkl_health != "missing")
+
+# Define the groups for the employment statuses
+group1 <- c("Paid employment(ft/pt)", "Self employed")
+group2 <- c("Unemployed", "Retired")
+group3 <- c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme")
+group4 <- c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
+
+# Create box plots for each group
+plot_group <- function(data, group, title) {
+  ggplot(data %>% filter(jkl_jbstat %in% group), 
+         aes(x = jkl_health, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'Health Status (jkl_health)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Employment Status'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Plotting each group
+plot1 <- plot_group(filtered_data, group1, 'Group 1: Paid Employment and Self Employed')
+plot2 <- plot_group(filtered_data, group2, 'Group 2: Unemployed and Retired')
+plot3 <- plot_group(filtered_data, group3, 'Group 3: Students, Homemakers, and Others')
+plot4 <- plot_group(filtered_data, group4, 'Group 4: Family Care, Temporarily Laid Off, and Other Inactive')
+
+# Print the plots
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
+
+```
+
+##### Household Composition, Size and Income
+
+The interaction between Household Composition and Size (jkl_hhsize, jkl_nkids_dv, jkl_hhtype_dv) with Income shows how larger households or those with more children may have different economic needs and financial pressures compared to smaller households. Understanding these relationships can help in designing social support programs, such as child benefits or family tax credits, to ensure economic stability and well-being for different household types.
+
+```{r}
+# Filter out missing category for household type if needed
+filtered_data <- data %>% filter(jkl_hhtype_dv != "missing")
+
+# Define the groups for the household types
+group1 <- c("1 adult under pensionable age, no children", "1 adult, 1 child", "1 adult, 2 or more children")
+group2 <- c("1 female, age 60+, no children", "1 male, aged 65+, no children", "2 adults, not a couple, 1 or more children")
+group3 <- c("2 adults, not a couple, both under pensionable age, no children", "2 adults, not a couple, one or more over pensionable age, no children", "3 or more adults, 1 or more children, excl. any couples")
+group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age, no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
+
+# Create box plots for each group
+plot_group <- function(data, group, title) {
+  ggplot(data %>% filter(jkl_hhtype_dv %in% group), 
+         aes(x = jkl_hhtype_dv, y = jkl_fimnnet_dv, fill = jkl_hhtype_dv)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'Household Composition (jkl_hhtype_dv)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Household Composition'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Plotting each group
+plot1 <- plot_group(filtered_data, group1, 'Group 1: Single Adults and Single Parents')
+plot2 <- plot_group(filtered_data, group2, 'Group 2: Older Adults and Non-couple Adults with Children')
+plot3 <- plot_group(filtered_data, group3, 'Group 3: Non-couple Adults and Large Households with Children')
+plot4 <- plot_group(filtered_data, group4, 'Group 4: Couples and Large Households without Children')
+
+# Print the plots
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
+
+```
+
+##### Tenure, Income and Employment Status
+
+The interaction between housing Tenure (jkl_tenure_dv) with Income and Employment Status is crucial, especially since homeownership is often associated with greater financial stability and wealth accumulation, while renting can be more common among lower-income and less stable employment groups. Analyzing this relationship can inform housing policies aimed at promoting homeownership and addressing rental market challenges.
+
+```{r}
+# Filter out missing category for housing tenure if needed
+filtered_data <- data %>% filter(jkl_tenure_dv != "missing")
+
+# Define the groups for the employment statuses
+employment_statuses <- list(
+  group1 = c("Paid employment(ft/pt)", "Self employed"),
+  group2 = c("Unemployed", "Retired"),
+  group3 = c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme"),
+  group4 = c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
+)
+
+# Define the groups for the housing tenure
+housing_tenures <- list(
+  group1 = c("Housing assoc rented", "Local authority rent"),
+  group2 = c("Owned outright", "Owned with mortgage"),
+  group3 = c("Rented from employer", "Rented private furnished", "Rented private unfurnished"),
+  group4 = c("Other", "missing")
+)
+
+# Create box plots for each combination of employment status and housing tenure
+plot_combination <- function(data, tenure_group, status_group, title) {
+  ggplot(data %>% filter(jkl_tenure_dv %in% tenure_group & jkl_jbstat %in% status_group), 
+         aes(x = jkl_tenure_dv, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
+    geom_boxplot() +
+    labs(
+      title = title,
+      x = 'Housing Tenure (jkl_tenure_dv)',
+      y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
+      fill = 'Employment Status'
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create and store plots for each combination of groups
+plot_list <- list()
+plot_number <- 1
+
+for (i in seq_along(housing_tenures)) {
+  for (j in seq_along(employment_statuses)) {
+    title <- paste('Plot', plot_number, ': Housing Tenure Group', i, 'and Employment Status Group', j)
+    plot_list[[plot_number]] <- plot_combination(filtered_data, housing_tenures[[i]], employment_statuses[[j]], title)
+    plot_number <- plot_number + 1
+  }
+}
+
+# Print the plots
+for (plot in plot_list) {
+  print(plot)
+}
+
+```
