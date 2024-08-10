@@ -53,6 +53,7 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 - **Processed Data**: Located in the data/processed` directory, this includes cleaned datasets ('variables.csv' and 'transformed_variables.csv') and geographical files ('RGN_DEC_2021_EN_BGC.*') used for spatial analysis.
 - **R Scripts**: Contained in the 'scripts/R' directory, including scripts for data processing ('Cleaning data dictionaries.R'), creating a GitHub repository ('create_github_repo.R'), exploratory data analysis ('Exploratory_Data_Analysis.Rmd' and the corresponding HTML report), and building the Shiny application ('Household_Financial_Health_Analytics_App.R').
 - **Python Scripts**: The `TransformCategoricalCodes_to_Labels.ipynb` notebook in `scripts/Python` is for transforming and cleaning datasets.
+- **SQL Script**: The `extracting_variables_for_HFHAP.sql` script is located in the `database` directory and describes the process used to extract relevant variables for analysis.
 - **Database**: The `variables for analysis.db` in the `database` directory contains the structured dataset for analysis.
 - **Project Files**: Includes the RStudio project file and DB Browser for SQLite project file (`variables for analysis.sqbpro`) in the `project_files` directory to manage and interact with the database efficiently.
 
