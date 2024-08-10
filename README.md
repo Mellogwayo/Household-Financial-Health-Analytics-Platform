@@ -48,19 +48,20 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 
 ## Files and Usage
 
-- **Data Files**: Located in the `data/raw` directory, original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) are the backbone for analysis.
+- **Data Files**: Located in the `data/raw` directory, original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) serve as the foundation for analysis.
 - **Data Dictionaries**: Found in `data/dictionaries`, RTF data dictionaries (`jkl_indresp_ukda_data_dictionary.rtf` & `jkl_hhresp_ukda_data_dictionary.rtf`) have been processed into CSV format (`hhresp_data_dictionary.csv` & `indresp_data_dictionary.csv`) for ease of use.
-- **Processed Data**: In `data/processed`, `variables.csv` as the raw dataset and `transformed_variables.csv` for the cleaned and labeled dataset ready for analysis.
-- **R Scripts**: Contained in `scripts/R`, the `Cleaning data dictionaries.R`, `analysis.R`, and `Household_Financial_Health_Analytics_App.R` scripts are used for data processing, visualization, and interactive analysis through a Shiny application.
+- **Processed Data**: Located in the data/processed` directory, this includes cleaned datasets ('variables.csv' and 'transformed_variables.csv') and geographical files ('RGN_DEC_2021_EN_BGC.*') used for spatial analysis.
+- **R Scripts**: Contained in the 'scripts/R' directory, including scripts for data processing ('Cleaning data dictionaries.R'), creating a GitHub repository ('create_github_repo.R'), exploratory data analysis ('Exploratory_Data_Analysis.Rmd' and the corresponding HTML report), and building the Shiny application ('Household_Financial_Health_Analytics_App.R').
 - **Python Scripts**: The `TransformCategoricalCodes_to_Labels.ipynb` notebook in `scripts/Python` is for transforming and cleaning datasets.
 - **Database**: The `variables for analysis.db` in the `database` directory contains the structured dataset for analysis.
 - **Project Files**: Includes the RStudio project file and DB Browser for SQLite project file (`variables for analysis.sqbpro`) in the `project_files` directory to manage and interact with the database efficiently.
 
 ## Citation
 
-University of Essex, Institute for Social and Economic Research. (2022). Understanding Society: Calendar Year Dataset, 2020. [data collection]. UK Data Service. SN: 8988, DOI: [http://doi.org/10.5255/UKDA-SN-8988-1](http://doi.org/10.5255/UKDA-SN-8988-1)
+1. University of Essex, Institute for Social and Economic Research. (2022). Understanding Society: Calendar Year Dataset, 2020. [data collection]. UK Data Service. SN: 8988, DOI: [http://doi.org/10.5255/UKDA-SN-8988-1](http://doi.org/10.5255/UKDA-SN-8988-1).
+
+2. Office for National Statistics. (2023). Regions (December 2021) EN BGC. [Dataset]. Available at: [https://geoportal.statistics.gov.uk/datasets/ons::regions-december-2021-en-bgc-1/about](https://geoportal.statistics.gov.uk/datasets/ons::regions-december-2021-en-bgc-1/about). Contains both Ordnance Survey and ONS Intellectual Property Rights.
 
 ---
 
 For more information, please contact the project maintainer at mellogwayo@gmail.com.
-
