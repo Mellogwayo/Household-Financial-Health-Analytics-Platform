@@ -41,11 +41,6 @@ The foundational data source is the Understanding Society: Calendar Year Dataset
 - **Innovation Opportunities**: Identifying trends for product development.
 - **Regulatory Compliance**: Ensuring ethical standards in data use.
 
-## Collaborative Partnerships
-
-- Engaging with stakeholders for knowledge-sharing.
-- Collective action to address broader societal issues.
-
 ## Files and Usage
 
 - **Data Files**: Located in the `data/raw` directory, original data files (`jkl_indresp.tab.csv` and `kl_hhresp.tab.csv`) serve as the foundation for analysis.
