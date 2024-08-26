@@ -7,6 +7,7 @@ The Household Financial Health Analytics Platform is an advanced analytical tool
 - Income, property and investment
 - Social attitudes and behaviour
 - Housing
+
 This comprehensive platform aims to analyze and visualize the socioeconomic and demographic information that shapes household financial stability, assisting organizations in policy-making and financial planning.
 
 ## Dataset Information
