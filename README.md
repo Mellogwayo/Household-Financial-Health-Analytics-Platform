@@ -2,7 +2,12 @@
 
 ## Description
 
-The Household Financial Health Analytics Platform is an advanced analytical tool designed to provide insights into the financial health of UK households, leveraging data from the Understanding Society: Calendar Year Dataset, 2020. This comprehensive platform aims to analyze and visualize the socioeconomic and demographic information that shapes household financial stability, assisting organizations in policy-making and financial planning.
+The Household Financial Health Analytics Platform is an advanced analytical tool designed to provide insights into the financial health of UK households, leveraging data from the Understanding Society: Calendar Year Dataset, 2020. The data set covers topics such as:
+- Social behaviour and attitudes
+- Income, property and investment
+- Social attitudes and behaviour
+- Housing
+This comprehensive platform aims to analyze and visualize the socioeconomic and demographic information that shapes household financial stability, assisting organizations in policy-making and financial planning.
 
 ## Dataset Information
 
