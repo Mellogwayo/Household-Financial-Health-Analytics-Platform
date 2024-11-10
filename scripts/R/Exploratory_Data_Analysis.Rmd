@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Load Necessary Libraries
 
-```{r}
+```{r Load Necessary Libraries, echo=FALSE}
 # Function to check and install packages if not already installed
 install_if_missing <- function(packages) {
   for (pkg in packages) {
@@ -32,7 +32,7 @@ install_if_missing(packages)
 
 ## Initial Data Preparation
 
-```{r, eval = FALSE}
+```{r Initial Data Preparation, eval = FALSE, echo=FALSE}
 # Only run the next codes if being run for the first time
 # Adjusted path for the database
 # con <- dbConnect(RSQLite::SQLite(), "/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/database/variables for analysis.db")
@@ -46,7 +46,7 @@ install_if_missing(packages)
 
 ## Load Data
 
-```{r}
+```{r Load Data, echo=FALSE}
 # Loading the data from the CSV file into a DataFrame
 data <- read.csv("/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/transformed_variables.csv")
 
@@ -58,26 +58,45 @@ head(data)
 
 ### Distribution of Sample Members by Country
 
-```{r}
-ggplot(data, aes(x = jkl_country)) + 
-  geom_bar() + 
-  labs(title = "Distribution of Sample Members by Country", x = "Country", y = "Count") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```{r Distribution of Sample Members by Country, echo=FALSE}
+# Calculate percentages
+data_percentage <- data %>%
+  count(jkl_country) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Plot with percentages on the y-axis
+ggplot(data_percentage, aes(x = jkl_country, y = percentage, fill = jkl_country)) +
+  geom_bar(stat = "identity") +  # Use stat = "identity" because we are plotting pre-computed values
+  labs(
+    title = "Distribution of Sample Members by Country",
+    x = "Country",
+    y = "Percentage"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_hue()
 ```
 
 Most of the respondents in this study are from England.
 
 ### Distribution of Members by Region
 
-```{r}
-ggplot(data, aes(x = jkl_gor_dv)) +
-  geom_bar() +
+```{r Distribution of Members by Region, echo=FALSE}
+# Calculate percentages
+data_percentage <- data %>%
+  count(jkl_gor_dv) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Plot with percentages on the y-axis
+ggplot(data_percentage, aes(x = jkl_gor_dv, y = percentage, fill = jkl_gor_dv)) +
+  geom_bar(stat = "identity") +  # Use stat = "identity" because we are plotting pre-computed values
   labs(
-    title = "Distribution of Members by Region",
+    title = "Distribution of Sample Members by Region",
     x = "Region",
-    y = "Count"
+    y = "Percentage"
   ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_hue()
+
 ```
 
 The South East, London, North west and Scotland were the regions that recorded the most respondents.
@@ -86,7 +105,7 @@ The North East had a significantly lower number of respondents.
 
 ### Employment Status Distribution
 
-```{r}
+```{r Employment Status Distribution, echo=FALSE}
 # Calculate percentages for the employment status
 employment_status <- data %>%
   count(jkl_jbstat) %>%
@@ -94,34 +113,78 @@ employment_status <- data %>%
 
 employment_status
 
-ggplot(data, aes(x = "", fill = jkl_jbstat)) + 
-  geom_bar(width = 1) + 
-  coord_polar(theta = "y") + 
+# Create labels with percentages for the legend
+employment_status$legend_labels <- paste(employment_status$jkl_jbstat, ": ", round(employment_status$percentage, 1), "%", sep="")
+
+# Create the pie chart with a legend displaying percentages
+ggplot(employment_status, aes(x = "", y = percentage, fill = jkl_jbstat)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
   labs(title = "Employment Status Distribution", x = NULL, y = NULL, fill = "Employment Status") +
   theme_void() +
-  theme(legend.title = element_text(size = 12), legend.text = element_text(size = 10))
+  theme(legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
+  guides(fill = guide_legend(title = "Employment Status", label.position = "right", label.hjust = 1)) +
+  scale_fill_manual(values = c("#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C")) +
+  scale_fill_discrete(labels = employment_status$legend_labels)
+
 ```
 
 42% of the respondents are retired whilst 39% of them are in paid employment. Other categories like long-term sickness or disability, family care, and being a student represent smaller but notable percentages of the whole data set.
 
-```{r}
-ggplot(data, aes(x = jkl_tenure_dv)) + 
-  geom_bar(fill = "steelblue") + 
-  labs(title = "Housing Tenure of Respondents", x = "Housing Tenure", y = "Count") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```{r Housing Tenure of Respondents, echo=FALSE}
+# Calculate percentages
+data_percentage <- data %>%
+  count(jkl_tenure_dv) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Plot with percentages on the y-axis
+ggplot(data_percentage, aes(x = jkl_tenure_dv, y = percentage, fill = jkl_tenure_dv)) +
+  geom_bar(stat = "identity") +  # Use stat = "identity" to plot pre-computed values
+  labs(
+    title = "Housing Tenure of Respondents",
+    x = "Housing Tenure",
+    y = "Percentage"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_hue() 
+
 ```
 
 A significant proportion of the population in this data set own their homes.
+```{r Scatter plot: Household Income vs Employment Status, colored by Region, echo=FALSE}
+# Scatter plot: Household Income vs Employment Status, colored by Region
+ggplot(data, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, color = jkl_gor_dv)) +
+  geom_point(alpha = 0.6) +  # Add transparency for better visualization
+  labs(
+    title = "Household Income vs. Employment Status",
+    x = "Employment Status",
+    y = "Household Income",
+    color = "Region"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
 
 ## Data Exploration and Feature Engineering
 
 ### Numerical Variables: Income Distributions
 
-```{r}
+```{r Numerical Variables: Income Distributions, echo=FALSE}
+# Define a mapping for variable names to descriptive titles
+variable_titles <- c(
+  "jkl_fimnnet_dv" = "Own total estimated net monthly income status",
+  "jkl_fihhmnnet1_dv" = "Net household monthly income"
+)
+
+# List of numeric variables
 numeric_variables <- c("jkl_fimnnet_dv", "jkl_fihhmnnet1_dv")
 summary_statistics_list <- list()
 
 for (var in numeric_variables) {
+  # Summary statistics calculation
   summary_statistics <- data %>%
     summarise(
       Mean = mean(.data[[var]], na.rm = TRUE),
@@ -131,18 +194,28 @@ for (var in numeric_variables) {
       Max = max(.data[[var]], na.rm = TRUE)
     )
   
-  print(paste("Summary statistics for", var))
+  # Print summary statistics with descriptive name
+  print(paste("Summary statistics for", variable_titles[[var]]))
   print(summary_statistics)
   
+  # Save summary statistics to list
   summary_statistics_list[[var]] <- summary_statistics
   
+  # Create histogram plot with updated title and mean line
   hist_plot <- ggplot(data, aes(x = !!sym(var))) +
     geom_histogram(binwidth = 100, fill = 'blue') +
-    labs(title = paste('Histogram of', var), x = var, y = 'Count') +
-    scale_x_continuous(limits = c(0, 30000))  # Adjust the limits as needed
+    geom_vline(aes(xintercept = summary_statistics$Mean), color = "red", linetype = "dashed") +
+    labs(
+      title = paste("Histogram of", variable_titles[[var]]), 
+      x = variable_titles[[var]], 
+      y = "Count"
+    ) +
+    scale_x_continuous(limits = c(0, 30000))  # Adjust limits as needed
   
+  # Print the plot
   print(hist_plot)
 }
+
 
 ```
 
@@ -153,8 +226,7 @@ The large standard deviation (1596.673) relative to the mean suggests there is s
 The income range is very wide, from -5589.49 to 102890.9 for the total net personal income and from -3306.16 to 104318.9 for the household income. This wide range indicates significant disparities in the dataset, with some individuals having very high incomes and others experiencing losses or debts. It also shows that the dataset has extreme values or outliers. There is a diverse set of incomes, including some cases of significant financial difficulties and some cases of substantial wealth.
 
 ### Calculating Correlation
-
-```{r}
+```{r Calculating Correlation, echo=FALSE}
 correlation_matrix <- data %>%
   select(all_of(numeric_variables)) %>% 
   cor(use = "complete.obs")
@@ -165,8 +237,27 @@ print(correlation_matrix)
 There is a moderate to strong positive relationship between personal incomes and household incomes. The relationship is strong enough to suggest that higher personal incomes are associated with higher household incomes.
 
 ### Categorical Variables
+```{r Categorical Variables, echo=FALSE}
+# Expanded mapping of variable names to descriptions
+variable_descriptions <- list(
+  "jkl_gor_dv" = "Region in the UK",
+  "jkl_jbstat" = "Employment status",
+  "jkl_jbnssec8_dv" = "Current job: Eight Class NS-SEC status",
+  "jkl_health" = "Long-standing illness or disability status",
+  "jkl_urban_dv" = "Urban or rural area (derived)",
+  "jkl_jbnssec5_dv" = "Current job: Five Class NS-SEC status",
+  "jkl_nkids_dv" = "Number of children aged under 16 in the household",
+  "jkl_sex_dv" = "Sex (derived)",
+  "jkl_hhtype_dv" = "Household composition",
+  "jkl_mastat_dv" = "Marital status",
+  "jkl_jbsoc00_cc" = "Standard Socio-economic Classification  of current job",
+  "jkl_jbnssec3_dv" = "Current job: Three Class NS-SEC status",
+  "bornuk_dv" = "Whether born in the UK or not",
+  "jkl_country"= "Country in the UK sample members currently live in",              
+"jkl_ethn_dv"= "Ethnic group (derived from multiple sources)",                    
+"jkl_tenure_dv" = "Housing tenure"
+)
 
-```{r}
 categorical_variables <- c("jkl_country", "jkl_gor_dv", "jkl_urban_dv", "jkl_sex_dv",
                            "jkl_mastat_dv", "jkl_jbstat", "jkl_ethn_dv", "bornuk_dv",
                            "jkl_jbsoc00_cc", "jkl_jbnssec8_dv", "jkl_jbnssec5_dv",
@@ -177,6 +268,9 @@ data_factors <- data %>%
   mutate(across(all_of(categorical_variables), factor))
 
 for (var in categorical_variables) {
+  # Get the description for the current variable or use the variable name if no description is found
+  var_description <- variable_descriptions[[var]] %||% var
+  
   cat("\nFrequency table for", var, ":\n")
   frequency_counts <- table(data_factors[[var]])
   print(frequency_counts)
@@ -185,22 +279,26 @@ for (var in categorical_variables) {
   cat("\nProportions for", var, ":\n")
   print(proportions)
   
-  bar_plot <- ggplot(data_factors, aes(x = !!sym(var))) +
-    geom_bar() +
-    labs(title = paste("Distribution of", var), x = var, y = "Count") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  bar_plot <- ggplot(data_factors, aes(x = !!sym(var), fill = !!sym(var))) +
+    geom_bar(aes(y = (..count..) / sum(..count..) * 100), alpha = 0.8) +  # Use proportion-based y-axis
+    labs(title = paste("Distribution of", var_description), x = var_description, y = "Percentage") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_y_continuous(labels = scales::percent_format(scale = 1)) +  # Display y-axis as percentages
+    guides(fill = guide_legend(title = var_description))  # Legend for colors
+  
   print(bar_plot)
 }
 
 cat_vars_summary <- summary(data_factors)
 print(cat_vars_summary)
+
 ```
 
 Participants are mainly from England but Northern Ireland, Scotland and Wales were also represented. Most participants were from urban areas. They were more than double those from rural areas. Female participants were the majority although not by a huge difference. Most participants are married. A significant number are divorced, living as a couple single and never married/in civil partnership and widowed. Majority of the participants are either retired or in paid employment. Most participants are British/ English/ Scottish/ Welsh/ Northern Irish. Other races were barely represented. Majority of the respondents were born in the UK. Most respondents had no long standing illness.
 
 The variable jkl_jbsoc00_cc was unclear, so an alternative chart was created. The variables jkl_jbnssec8_dv, jkl_jbnssec5_dv, and jkl_jbnssec3_dv showed that most respondents marked their profession as inapplicable. Therefore, the following plots were created, excluding the inapplicable category from these variables.
 
-```{r}
+```{r Employment Status Categories, echo=FALSE}
 # Calculate percentages for the job info
 jobinfo <- data %>%
   count(jkl_jbsoc00_cc) %>%
@@ -235,7 +333,7 @@ print(top_20_plot)
 
 The largest group of respondents falls under "Lower management & professional," comprising just under 30%. "Semi-routine," "Intermediate," "Small employers & own account," "Higher professional," and "Routine" categories each account for a smaller but still significant proportion of the respondents."Lower supervisory & technical," "Large employers & higher management," and "Missing" categories represent the smallest percentages, each below 10%. This distribution highlights the predominance of lower management and professional roles among respondents, with a diverse spread across other employment statuses.
 
-```{r}
+```{r Classification of current job eight-class model, echo=FALSE}
 # Filter out the 'inapplicable' category
 filtered_data1 <- data %>%
   filter(jkl_jbnssec8_dv != "inapplicable")
@@ -266,7 +364,7 @@ print(sec_plot)
 
 When looking at the "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) eight-class model", the largest group of respondents have "Management & professional" as their employment status. They comprise of just under 45% of the total respondents. "Semi-routine & Routine" represents just above 20% of the population. "Intermediate" accounts for just below 15 % of the total population. "Small employers & own account" represents close to 10% of the population. Whereas "Lower supervisory & technical," and the "Missing" categories represent the smallest percentages, each below 10%. This distribution indicates that a substantial portion of the respondents occupy lower management and professional roles, while fewer are in higher management or supervisory positions.
 
-```{r}
+```{r Classification of an individuals current job five-class model, echo=FALSE}
 # Filter out the 'inapplicable' category
 filtered_data2 <- data %>%
   filter(jkl_jbnssec5_dv != "inapplicable")
@@ -297,7 +395,7 @@ print(sec_plot5)
 
 Based on the National Statistics Socio-economic Classification (NS-SEC) five-class model, most respondents' current jobs are categorized as "Lower management & professional," making up nearly 30% of the total. This is followed by "Semi-routine" and "Routine" jobs, which together account for just over 20%. The "Intermediate" category includes just under 15% of the respondents. About 10% of the population falls under "Small employers & own account." The "Lower supervisory & technical" and "Missing" categories have the smallest representation, each below 10%. This indicates a significant concentration of respondents in professional and management roles, with fewer in supervisory or technical positions.
 
-```{r}
+```{r Classification of current job three-class model, echo=FALSE}
 # Filter out the 'inapplicable' category
 filtered_data3 <- data %>%
   filter(jkl_jbnssec3_dv != "inapplicable")
@@ -315,7 +413,7 @@ print(sec3)
 sec_plot3 <- ggplot(sec3, aes(x = reorder(jkl_jbnssec3_dv, percentage), y = percentage)) +
   geom_bar(stat = "identity", fill = 'blue') +
   labs(
-    title = "Classification of an individual's current job based on the National Statistics Socio-economic Classification (NS-SEC) three-class model",
+    title = "Classification of current job based on the NS-SEC 3 class model",
     x = 'Employment Status', 
     y = 'Percentage'
   ) +
@@ -331,7 +429,7 @@ The National Statistics Socio-economic Classification (NS-SEC) three-class model
 
 ### Key Variable Analysis
 
-```{r}
+```{r Key Variables, echo=FALSE }
 names(data)
 ```
 
@@ -343,7 +441,7 @@ Variables that showcase demographics include Household Identifiers (jkl_hidp, j_
 
 The Household Identifiers (jkl_hidp, j_hidp, k_hidp, l_hidp) are crucial for distinguishing between different households and linking data across different waves. Understanding household dynamics is essential for economic analyses, such as household income distribution and the impact of economic policies on households. By linking personal and household identifiers (pidp, jkl_hidp, j_hidp, k_hidp, l_hidp), researchers can track individual and household economic outcomes over time. This relationship is essential for longitudinal studies to understand how personal and household circumstances change and the impact of economic policies over different periods.
 
-```{r}
+```{r Distribution of Household Sizes, echo=FALSE}
 # Check uniqueness of personal identifiers
 unique_pidp <- length(unique(data$pidp)) == nrow(data)
 cat("Are all pidp values unique? ", unique_pidp, "\n")
@@ -400,27 +498,50 @@ Employment Status (jkl_jbstat) is directly linked to income levels, economic sta
 
 The plots below showcase how employment status varies accross different demographics represented in the study.
 
-```{r}
+```{r Employment status varies accross different demographics, echo=FALSE}
+# Create a mapping of variable names to descriptive names
+variable_descriptions <- list(
+  "jkl_jbstat" = "Employment Status",
+  "jkl_country" = "Country",
+  "jkl_urban_dv" = "Urban and Rural Areas",
+  "jkl_sex_dv" = "Sex",
+  "jkl_ethn_dv" = "Ethnic Group"
+)
+
 key_variable <- "jkl_jbstat"
 variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
 
-for (var in variables_to_pair){count_table <- table(data_factors[[key_variable]], data_factors[[var]])
-  
+for (var in variables_to_pair) {
+  # Create a contingency table and proportion table
+  count_table <- table(data_factors[[key_variable]], data_factors[[var]])
   prop_table <- prop.table(count_table, 1)
   prop_df <- as.data.frame(prop_table)
   
+  # Rename columns for clarity
   names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
   
+  # Get descriptive names for the key and paired variables
+  key_desc <- variable_descriptions[[key_variable]]
+  var_desc <- variable_descriptions[[var]]
+  
+  # Create the plot with descriptive titles
   plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
     geom_bar(stat = "identity", position = "fill") +
     geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
-    labs(title = paste("Proportion of", var, "within", key_variable),
-         x = key_variable, y = "Proportion") +
+    labs(
+      title = paste("Proportion of", var_desc, "within", key_desc),
+      x = key_desc,
+      y = "Proportion"
+    ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  print(plot)}
+  
+  print(plot)
+}
+
+
 ```
 
-```{r}
+```{r Employment Status within Regions in the UK, echo=FALSE}
 # Calculate the proportions
 data_proportion <- data %>%
   group_by(jkl_gor_dv, jkl_jbstat) %>%
@@ -444,68 +565,145 @@ ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = jkl_jbstat)) 
 
 ```
 
-```{r}
-# Change "Yorkshire and the Humber" to "Yorkshire and The Humber" to match the map 
+
+```{r Most Common Employment Status in Each Region, echo=FALSE}
+# Calculate the percentage of each job status within each region
+job_status_percentage <- data %>%
+  group_by(jkl_gor_dv, jkl_jbstat) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(jkl_gor_dv) %>%
+  mutate(total_in_region = sum(count),  # Total count in each region
+         percentage = (count / total_in_region) * 100) %>%  # Calculate percentage
+  select(jkl_gor_dv, jkl_jbstat, count, percentage) %>%  # Keep only relevant columns
+  arrange(jkl_gor_dv, desc(percentage))
+
+# Display the resulting data frame
+print(job_status_percentage)
+
+
+# Change "Yorkshire and the Humber" to "Yorkshire and The Humber" to match the map
 data <- data %>%
   mutate(jkl_gor_dv = ifelse(jkl_gor_dv == "Yorkshire and the Humber", "Yorkshire and The Humber", jkl_gor_dv))
 
 # Define the path to the shapefile
 shapefile_path <- "/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/RGN_DEC_2021_EN_BGC.shp"
 
-# Read the shapefile
+# Read and simplify shapefile
 uk_shapefile <- st_read(shapefile_path)
-
-# Simplify the geometry
 uk_shapefile_simplified <- ms_simplify(uk_shapefile, keep = 0.01) 
 
-# Unique values in the shapefile
-cat("Unique values in shapefile (RGN21NM):\n")
-print(unique(uk_shapefile_simplified$RGN21NM))
+# Calculate the top 5 most common jkl_jbstat by percentage for each region
+top_5_jbstat_percentage <- data %>%
+  group_by(jkl_gor_dv, jkl_jbstat) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(jkl_gor_dv) %>%
+  mutate(total = sum(count)) %>%
+  mutate(percentage = (count / total) * 100) %>%
+  arrange(jkl_gor_dv, desc(percentage)) %>%
+  slice_max(order_by = percentage, n = 5, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(jkl_gor_dv, jkl_jbstat, percentage)
 
-# Unique values in your data
-cat("Unique values in data (jkl_gor_dv):\n")
-print(unique(data$jkl_gor_dv))
+# Define the color palette for each job status
+job_status_palette <- c(
+  "Paid employment(ft/pt)" = "#1f78b4",
+  "Self employed" = "#33a02c",
+  "Retired" = "#e31a1c",
+  "LT sick or disabled" = "#ff7f00",
+  "Family care or home" = "#6a3d9a",
+  "Full-time student" = "#b15928",
+  "Unemployed" = "#a6cee3",
+  "Unpaid, family business" = "#fb9a99",
+  "On apprenticeship" = "#fdbf6f",
+  "Doing something else" = "#cab2d6",
+  "On maternity leave" = "#ffff99",
+  "refusal" = "#b2df8a",
+  "On furlough" = "#1c9099",
+  "Temporarily laid off/short term working" = "#ff0055",
+  "Govt training scheme" = "#7fc97f",
+  "don't know" = "#fbb4ae"
+)
 
-# Inspect column names in the shapefile
-cat("Column names in the shapefile:\n")
-print(names(uk_shapefile_simplified))
+# Convert palette to a data frame for plotting
+job_status_df <- data.frame(
+  JobStatus = names(job_status_palette),
+  Color = job_status_palette
+)
 
-# Inspect column names in your data
-cat("Column names in your data:\n")
-print(names(data))
+# Plot the color palette with only job status names
+library(ggplot2)
 
-# Define the regions present in the shapefile
-regions_in_shapefile <- unique(uk_shapefile_simplified$RGN21NM)
+ggplot(job_status_df, aes(x = reorder(JobStatus, desc(JobStatus)), y = 1, fill = JobStatus)) +
+  geom_bar(stat = "identity", width = 0.8) +
+  geom_text(aes(label = JobStatus), 
+            hjust = 0, 
+            vjust = 0.5, 
+            size = 3, 
+            nudge_y = -0.5) +  # Position labels on the left of each bar
+  scale_fill_manual(values = job_status_palette) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size = 14),
+    axis.text.y = element_blank(),  # Hide y-axis text since labels are displayed as text
+    axis.ticks.y = element_blank()
+  ) +
+  labs(title = "Job Status Color Palette") +
+  coord_flip() +  # Flip coordinates for readability
+  theme(plot.margin = margin(10, 20, 10, 30))  # Add margin for extra spacing
 
-# Filter the data to include only the regions present in the shapefile
-filtered_data <- data %>%
-  filter(jkl_gor_dv %in% regions_in_shapefile)
+# Loop through each of the top 5 job statuses to create maps
+for (i in 1:5) {
+  # Filter for each top job status by position
+  job_status_data <- top_5_jbstat_percentage %>%
+    group_by(jkl_gor_dv) %>%
+    slice(i) %>%
+    ungroup()
+  
+  # Merge simplified shapefile with job status data
+  map_data <- uk_shapefile_simplified %>%
+    left_join(job_status_data, by = c("RGN21NM" = "jkl_gor_dv"))
+  
+  # Plot map with percentage color scale and job status legend
+  p <- ggplot(data = map_data) +
+    geom_sf(aes(fill = percentage), color = "white") +
+    scale_fill_viridis_c(option = "plasma", name = "Percentage", na.value = "lightgrey") +  # Percentage color scale
+    scale_color_manual(name = "Employment Status", values = job_status_palette, guide = "legend") +  # Employment status legend
+    labs(
+      title = paste("Top", i, "Most Common Employment Status in Each Region"),
+      fill = "Percentage"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "bottom",
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 8)
+    ) +
+    guides(
+      fill = guide_colorbar(order = 1),  # Order for the percentage color bar
+      color = guide_legend(override.aes = list(fill = job_status_palette), order = 2)  # Order for employment status legend
+    )
+  
+  # Print map
+  print(p)
+}
 
-# Merge simplified shapefile with the filtered data
-uk_data_filtered <- uk_shapefile_simplified %>%
-  left_join(filtered_data, by = c("RGN21NM" = "jkl_gor_dv"))
 
-# Plot the map
-ggplot(data = uk_data_filtered) +
-  geom_sf(aes(fill = jkl_jbstat)) +
-  scale_fill_viridis_d() +
-  theme_minimal() +
-  labs(
-    title = "Employment Status in Different Regions in the UK",
-    fill = "Employment Status"
-  )
 ```
 
-```{r}
-# Summarize the data to get proportions
+
+```{r Proportion of Ethnic Group within different Employment Status groups, echo=FALSE}
+# Summarize the data to get proportions within each jkl_jbstat group
 data_summary <- data %>%
   group_by(jkl_jbstat, jkl_ethn_dv) %>%
   summarise(count = n(), .groups = 'drop') %>%
-  mutate(proportion = count / sum(count))
+  group_by(jkl_jbstat) %>%
+  mutate(proportion = count / sum(count),
+         percent_label = paste0(jkl_ethn_dv, " (", round(proportion * 100, 1), "%)"))
 
-#Long format for pie chart 
+# Long format for pie chart
 data_long <- data_summary %>%
-  select(jkl_jbstat, jkl_ethn_dv, proportion)
+  select(jkl_jbstat, jkl_ethn_dv, proportion, percent_label)
 
 # Get unique categories of jkl_jbstat
 categories <- unique(data_long$jkl_jbstat)
@@ -514,18 +712,20 @@ categories <- unique(data_long$jkl_jbstat)
 for (category in categories) {
   plot_data <- data_long %>% filter(jkl_jbstat == category)
   
-  p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+  p <- ggplot(plot_data, aes(x = "", y = proportion, fill = percent_label)) +
     geom_bar(width = 1, stat = "identity") +
     coord_polar("y", start = 0) +
     theme_minimal(base_size = 15) +
-    labs(title = paste("Proportion of jkl_ethn_dv within", category),
-         fill = "Ethnic Group",
+    labs(title = paste("Proportion of Ethnic Group within Employment Status:", category),
+         fill = "Ethnic Group (with %)",
          y = "Proportion",
          x = "") +
     theme(
       axis.text.x = element_blank(),
       axis.ticks = element_blank(),
-      plot.title = element_text(size = 16)
+      plot.title = element_text(size = 16),
+      legend.text = element_text(size = 8),
+      legend.title = element_text(size = 12) 
     )
   
   # Print the plot
@@ -534,11 +734,23 @@ for (category in categories) {
 
 ```
 
+
 #### Socio-economic Classification
 
 Standard Socio-economic Classification (SOC) (jkl_jbsoc00_cc, jkl_jbnssec8_dv, jkl_jbnssec5_dv, jkl_jbnssec3_dv) provide a detailed look at occupational status and social class. They are crucial for studying social mobility, occupational earnings, and the impact of economic policies on different socio-economic groups.
 
-```{r}
+```{r Socio-economic Classification, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_jbnssec8_dv" = "Current job: Eight Class NS-SEC status",
+  "jkl_jbnssec5_dv" = "Current job: Five Class NS-SEC status",
+  "jkl_jbnssec3_dv" = "Current job: Three Class NS-SEC status",
+  "jkl_country" = "Country in the UK sample members currently live in",
+  "jkl_urban_dv" = "Urban or rural area ",
+  "jkl_sex_dv" = "Sex ",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
 variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
 
@@ -551,11 +763,15 @@ for (key_variable in key_variables) {
     
     names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
     
+    # Generate plot with descriptive labels in the title
     plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
       geom_bar(stat = "identity", position = "fill") +
       geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
-      labs(title = paste("Proportion of", var, "within", key_variable),
-           x = key_variable, y = "Proportion") +
+      labs(
+        title = paste("Proportion of", variable_labels[[var]], "within", variable_labels[[key_variable]]),
+        x = variable_labels[[key_variable]],
+        y = "Proportion"
+      ) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
     
     print(plot)
@@ -563,8 +779,15 @@ for (key_variable in key_variables) {
 }
 ```
 
-```{r}
-# List of key variables
+```{r Proportion of Current job Class status within Regions in the UK, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_jbnssec8_dv" = "Current job: Eight Class NS-SEC status",
+  "jkl_jbnssec5_dv" = "Current job: Five Class NS-SEC status",
+  "jkl_jbnssec3_dv" = "Current job: Three Class NS-SEC status",
+  "jkl_gor_dv" = "Region"
+)
+
 key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
 
 # Loop over each key variable
@@ -576,16 +799,16 @@ for (key_variable in key_variables) {
     summarise(count = n(), .groups = 'drop') %>%
     mutate(proportion = count / sum(count))
   
-  # Create the stacked bar chart
+  # Create the stacked bar chart with descriptive labels
   plot <- ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = !!sym(key_variable))) +
     geom_bar(stat = "identity", position = "fill") +
     scale_y_continuous(labels = scales::percent_format()) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "within Regions in the UK"),
-      x = "Region",
+      title = paste("Proportion of", variable_labels[[key_variable]], "within Regions in the UK"),
+      x = variable_labels[["jkl_gor_dv"]],
       y = "Proportion",
-      fill = key_variable
+      fill = variable_labels[[key_variable]]
     ) +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
@@ -597,7 +820,15 @@ for (key_variable in key_variables) {
 
 ```
 
-```{r}
+```{r Map of the Proportion of Current Job Class status within Regions in the UK, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_jbnssec8_dv" = "Current job: Eight Class NS-SEC status",
+  "jkl_jbnssec5_dv" = "Current job: Five Class NS-SEC status",
+  "jkl_jbnssec3_dv" = "Current job: Three Class NS-SEC status",
+  "jkl_gor_dv" = "Region"
+)
+
 # List of key variables
 key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
 
@@ -627,33 +858,50 @@ for (key_variable in key_variables) {
   filtered_data_variable <- filtered_data %>%
     filter(!!sym(key_variable) != "inapplicable")
   
+  # Calculate percentages for each category within each region
+  legend_labels <- filtered_data_variable %>%
+    group_by(!!sym(key_variable)) %>%
+    summarise(count = n()) %>%
+    mutate(percentage = round((count / sum(count)) * 100, 1)) %>%
+    mutate(label = paste(!!sym(key_variable), "(", percentage, "%)", sep = "")) %>%
+    pull(label, !!sym(key_variable))
+  
   # Merge simplified shapefile with the filtered data for the current key variable
   uk_data_filtered <- uk_shapefile_simplified %>%
     left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
   
-  # Plot the map for the current key variable
+  # Plot the map for the current key variable with descriptive labels and percentages in the legend
   plot <- ggplot(data = uk_data_filtered) +
     geom_sf(aes_string(fill = key_variable)) +
-    scale_fill_viridis_d() +
+    scale_fill_viridis_d(labels = legend_labels) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
-      fill = key_variable
+      title = paste("Proportion of", variable_labels[[key_variable]], "in Different Regions in the UK"),
+      fill = variable_labels[[key_variable]]
     )
   
   # Print the plot
   print(plot)
 }
 
+
 ```
 
-##### 
 
-```{r}
+```{r Proportion of Ethnic groups within various job class status, echo=FALSE}
+
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_jbnssec8_dv" = "Current job: Eight Class NS-SEC status",
+  "jkl_jbnssec5_dv" = "Current job: Five Class NS-SEC status",
+  "jkl_jbnssec3_dv" = "Current job: Three Class NS-SEC status",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 # List of key variables for pie charts
 key_variables <- c("jkl_jbnssec8_dv", "jkl_jbnssec5_dv", "jkl_jbnssec3_dv")
 
-# Loop over each key variable
+# Loop over each key variable to create pie charts without legend
 for (key_variable in key_variables) {
   # Summarize the data to get proportions
   data_summary <- data %>%
@@ -673,25 +921,48 @@ for (key_variable in key_variables) {
     plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
     
     p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
-      geom_bar(width = 1, stat = "identity") +
+      geom_bar(width = 1, stat = "identity", show.legend = FALSE) +  # Remove legend
       coord_polar("y", start = 0) +
       theme_minimal(base_size = 15) +
       labs(
-        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
-        fill = "Ethnic Group",
+        title = paste("Proportion of", variable_labels[["jkl_ethn_dv"]], "within", category, "of", variable_labels[[key_variable]]),
         y = "Proportion",
         x = ""
       ) +
       theme(
         axis.text.x = element_blank(),
         axis.ticks = element_blank(),
-        plot.title = element_text(size = 16)
+        plot.title = element_text(size = 10)
       )
     
-    # Print the plot
+    # Print the individual pie chart
     print(p)
   }
 }
+
+# Create a separate legend chart
+legend_data <- data %>%
+  distinct(jkl_ethn_dv) %>%
+  mutate(proportion = 1)  # Dummy proportion for creating the legend
+
+legend_plot <- ggplot(legend_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+  geom_bar(width = 1, stat = "identity") +
+  theme_void() +
+  labs(
+    title = "Ethnic Group Legend",
+    fill = variable_labels[["jkl_ethn_dv"]]
+  ) +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  ) +
+  guides(fill = guide_legend(ncol = 1))  # Adjust columns for the legend if needed
+
+# Print the separate legend chart
+print(legend_plot)
+
+
 
 ```
 
@@ -699,7 +970,16 @@ for (key_variable in key_variables) {
 
 Health and Well-being (jkl_health) show how health status significantly affects economic productivity and quality of life. Poor health can lead to increased healthcare costs and reduced labor market participation. These variables are essential for understanding the economic impact of health and designing health-related economic policies.
 
-```{r}
+```{r Health and Well-being, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_health" = " Long-standing illness or disability status",
+  "jkl_country" = "Country in the UK sample members currently live in",
+  "jkl_urban_dv" = "Urban or rural area",
+  "jkl_sex_dv" = "Sex",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 key_variable <- "jkl_health"
 variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
 
@@ -711,17 +991,27 @@ for (var in variables_to_pair) {
   
   names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
   
+  # Retrieve labels from variable_labels
+  key_label <- variable_labels[[key_variable]]
+  paired_label <- variable_labels[[var]]
+  
   plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
     geom_bar(stat = "identity", position = "fill") +
     geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
-    labs(title = paste("Proportion of", var, "within", key_variable),
-         x = key_variable, y = "Proportion") +
+    labs(
+      title = paste("Proportion of", paired_label, "within", key_label),
+      x = key_label,
+      y = "Proportion"
+    ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Print the plot
   print(plot)
 }
+
 ```
 
-```{r}
+```{r Proportion of Long-standing illness or disability status within Regions in the UK, echo=FALSE}
 # List of key variables
 key_variables <- "jkl_health"
 
@@ -740,7 +1030,7 @@ for (key_variable in key_variables) {
     scale_y_continuous(labels = scales::percent_format()) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "within Regions in the UK"),
+      title = paste("Proportion of Long-standing illness or disability status within Regions in the UK"),
       x = "Region",
       y = "Proportion",
       fill = key_variable
@@ -784,18 +1074,26 @@ for (key_variable in key_variables) {
   filtered_data_variable <- filtered_data %>%
     filter(!!sym(key_variable) != "inapplicable")
   
+  # Calculate percentage for each category in key_variable
+  legend_labels <- filtered_data_variable %>%
+    group_by(!!sym(key_variable)) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(percentage = round((count / sum(count)) * 100, 1)) %>%
+    mutate(label = paste(!!sym(key_variable), "(", percentage, "%)", sep = "")) %>%
+    pull(label, !!sym(key_variable))
+  
   # Merge simplified shapefile with the filtered data for the current key variable
   uk_data_filtered <- uk_shapefile_simplified %>%
     left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
   
-  # Plot the map for the current key variable
+  # Plot the map for the current key variable with percentages in the legend
   plot <- ggplot(data = uk_data_filtered) +
     geom_sf(aes_string(fill = key_variable)) +
-    scale_fill_viridis_d() +
+    scale_fill_viridis_d(labels = legend_labels) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
-      fill = key_variable
+      title = "Proportion of Long-standing illness or disability status in Different Regions in the UK",
+      fill = "Health Status"
     )
   
   # Print the plot
@@ -804,7 +1102,13 @@ for (key_variable in key_variables) {
 
 ```
 
-```{r}
+```{r Proportion of Ethnic group within various Long-standing illness or disability status categories, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_health" = "Long-standing illness or disability status",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 # List of key variables for pie charts
 key_variables <- "jkl_health"
 
@@ -827,16 +1131,28 @@ for (key_variable in key_variables) {
   for (category in categories) {
     plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
     
+    # Calculate percentage for each ethnic group category
+    legend_labels <- plot_data %>%
+      mutate(percentage = round(proportion * 100, 1)) %>%
+      mutate(label = paste(jkl_ethn_dv, "(", percentage, "%)", sep = "")) %>%
+      pull(label, jkl_ethn_dv)
+    
+    # Get the descriptive label for key_variable and jkl_ethn_dv
+    key_label <- variable_labels[[key_variable]]
+    ethn_label <- variable_labels[["jkl_ethn_dv"]]
+    
+    # Create the pie chart with the updated legend labels
     p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
       geom_bar(width = 1, stat = "identity") +
       coord_polar("y", start = 0) +
       theme_minimal(base_size = 15) +
       labs(
-        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
-        fill = "Ethnic Group",
+        title = paste("Proportion of", ethn_label, "within", category, "of", key_label),
+        fill = ethn_label,
         y = "Proportion",
         x = ""
       ) +
+      scale_fill_manual(values = scales::hue_pal()(length(legend_labels)), labels = legend_labels) +
       theme(
         axis.text.x = element_blank(),
         axis.ticks = element_blank(),
@@ -848,6 +1164,8 @@ for (key_variable in key_variables) {
   }
 }
 
+
+
 ```
 
 #### Household Composition and Size & Housing Tenure
@@ -856,7 +1174,17 @@ Household Composition and Size (jkl_hhsize, jkl_nkids_dv, jkl_hhtype_dv) affects
 
 Housing Tenure (jkl_tenure_dv), which show whether renting or owning affects household expenditure, wealth accumulation, and financial stability. This variable is important for studying housing market trends and the impact of housing policies.
 
-```{r}
+```{r Proportion of residents by region, living environment, gender, and ethnicity within different housing tenure categories, echo=FALSE}
+
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_tenure_dv" = "Housing Tenure",
+  "jkl_country" = "Country in the UK sample members currently live in",
+  "jkl_urban_dv" = "Urban or rural area",
+  "jkl_sex_dv" = "Sex",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 key_variable <- "jkl_tenure_dv"
 variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
 
@@ -866,19 +1194,31 @@ for (var in variables_to_pair) {
   prop_table <- prop.table(count_table, 1)
   prop_df <- as.data.frame(prop_table)
   
-  names(prop_df) <- c("KeyVariable", "PairedVariable", "Proportion")
+  # Rename columns for readability
+  names(prop_df) <- c("HousingTenure", "PairedVariable", "Proportion")
   
-  plot <- ggplot(prop_df, aes(x = KeyVariable, y = Proportion, fill = PairedVariable)) +
+  # Retrieve descriptive labels for key_variable and var
+  key_label <- variable_labels[[key_variable]]
+  paired_label <- variable_labels[[var]]
+  
+  # Create the plot with "Housing Tenure" on the x-axis
+  plot <- ggplot(prop_df, aes(x = HousingTenure, y = Proportion, fill = PairedVariable)) +
     geom_bar(stat = "identity", position = "fill") +
     geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
-    labs(title = paste("Proportion of", var, "within", key_variable),
-         x = key_variable, y = "Proportion") +
+    labs(
+      title = paste("Proportion of", paired_label, "within", key_label),
+      x = key_label,
+      y = "Proportion"
+    ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Print the plot
   print(plot)
 }
+
 ```
 
-```{r}
+```{r Proportion of various Housing Tenures within Regions in the UK, echo=FALSE}
 # List of key variables
 key_variables <- "jkl_tenure_dv"
 
@@ -897,7 +1237,7 @@ for (key_variable in key_variables) {
     scale_y_continuous(labels = scales::percent_format()) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "within Regions in the UK"),
+      title = paste("Proportion of various Housing Tenures within Regions in the UK"),
       x = "Region",
       y = "Proportion",
       fill = key_variable
@@ -912,7 +1252,7 @@ for (key_variable in key_variables) {
 
 ```
 
-```{r}
+```{r Proportion of Housing Tenures in Different Regions in the UK, echo=FALSE}
 # List of key variables
 key_variables <- "jkl_tenure_dv"
 
@@ -942,70 +1282,110 @@ for (key_variable in key_variables) {
   filtered_data_variable <- filtered_data %>%
     filter(!!sym(key_variable) != "inapplicable")
   
+  # Calculate percentages for each housing tenure category
+  legend_labels <- filtered_data_variable %>%
+    group_by(!!sym(key_variable)) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    mutate(percentage = round((count / sum(count)) * 100, 1)) %>%
+    mutate(label = paste(!!sym(key_variable), "(", percentage, "%)", sep = "")) %>%
+    pull(label, !!sym(key_variable))
+  
   # Merge simplified shapefile with the filtered data for the current key variable
   uk_data_filtered <- uk_shapefile_simplified %>%
     left_join(filtered_data_variable, by = c("RGN21NM" = "jkl_gor_dv"))
   
-  # Plot the map for the current key variable
+  # Plot the map for the current key variable with percentages in the legend
   plot <- ggplot(data = uk_data_filtered) +
     geom_sf(aes_string(fill = key_variable)) +
-    scale_fill_viridis_d() +
+    scale_fill_viridis_d(labels = legend_labels) +
     theme_minimal() +
     labs(
-      title = paste("Proportion of", key_variable, "in Different Regions in the UK"),
-      fill = key_variable
+      title = "Proportion of Housing Tenures in Different Regions in the UK",
+      fill = "Housing Tenure"
     )
   
   # Print the plot
   print(plot)
 }
 
+
 ```
 
-```{r}
+```{r Proportion of ethnicity within different housing tenure categories, echo=FALSE}
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_tenure_dv" = "Housing Tenure",
+  "jkl_ethn_dv" = "Ethnic group"
+)
 
 # List of key variables for pie charts
-key_variables <- "jkl_tenure_dv"
+key_variable <- "jkl_tenure_dv"
 
-# Loop over each key variable
-for (key_variable in key_variables) {
-  # Summarize the data to get proportions
-  data_summary <- data %>%
-    group_by(!!sym(key_variable), jkl_ethn_dv) %>%
-    summarise(count = n(), .groups = 'drop') %>%
-    mutate(proportion = count / sum(count))
+# Summarize the data to get proportions for each category in key_variable and jkl_ethn_dv
+data_summary <- data %>%
+  group_by(!!sym(key_variable), jkl_ethn_dv) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  mutate(proportion = count / sum(count))
+
+# Long format for pie chart
+data_long <- data_summary %>%
+  select(!!sym(key_variable), jkl_ethn_dv, proportion)
+
+# Get unique categories of the current key variable
+categories <- unique(data_long[[key_variable]])
+
+# Generate and print pie charts for each category without legend
+for (category in categories) {
+  plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
   
-  #Long format for pie chart 
-  data_long <- data_summary %>%
-    select(!!sym(key_variable), jkl_ethn_dv, proportion)
+  # Retrieve descriptive labels
+  key_label <- variable_labels[[key_variable]]
+  ethn_label <- variable_labels[["jkl_ethn_dv"]]
   
-  # Get unique categories of the current key variable
-  categories <- unique(data_long[[key_variable]])
+  p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
+    geom_bar(width = 1, stat = "identity", show.legend = FALSE) +  # Suppress legend in pie chart
+    coord_polar("y", start = 0) +
+    theme_minimal(base_size = 15) +
+    labs(
+      title = paste("Proportion of", ethn_label, "within", category, "of", key_label),
+      y = "Proportion",
+      x = ""
+    ) +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(size = 16)
+    )
   
-  # Generate and print pie charts for each category
-  for (category in categories) {
-    plot_data <- data_long %>% filter((!!sym(key_variable)) == category)
-    
-    p <- ggplot(plot_data, aes(x = "", y = proportion, fill = jkl_ethn_dv)) +
-      geom_bar(width = 1, stat = "identity") +
-      coord_polar("y", start = 0) +
-      theme_minimal(base_size = 15) +
-      labs(
-        title = paste("Proportion of jkl_ethn_dv within", category, "of", key_variable),
-        fill = "Ethnic Group",
-        y = "Proportion",
-        x = ""
-      ) +
-      theme(
-        axis.text.x = element_blank(),
-        axis.ticks = element_blank(),
-        plot.title = element_text(size = 16)
-      )
-    
-    # Print the plot
-    print(p)
-  }
+  # Print the pie chart
+  print(p)
 }
+
+# Create a separate chart for the legend
+legend_data <- data_long %>%
+  group_by(jkl_ethn_dv) %>%
+  summarise(total_proportion = sum(proportion)) %>%
+  mutate(percentage = round(total_proportion * 100, 1)) %>%
+  mutate(label = paste(jkl_ethn_dv, "(", percentage, "%)", sep = ""))
+
+legend_plot <- ggplot(legend_data, aes(x = "", y = total_proportion, fill = jkl_ethn_dv)) +
+  geom_bar(stat = "identity") +
+  theme_void() +
+  labs(
+    title = ethn_label,
+    fill = ethn_label
+  ) +
+  scale_fill_manual(values = scales::hue_pal()(length(legend_data$label)), labels = legend_data$label) +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  ) +
+  guides(fill = guide_legend(ncol = 1))  # Control columns in the legend if needed
+
+# Print the separate legend chart
+print(legend_plot)
+
 
 ```
 
@@ -1013,7 +1393,17 @@ for (key_variable in key_variables) {
 
 Net Household Monthly Income (jkl_fihhmnnet1_dv) is a critical measure of economic well-being. It influences consumption, savings, and investment decisions. Analyzing household income helps in understanding economic inequality and the standard of living.
 
-```{r}
+```{r Distribution of Net Household Monthly Income across various regions, living environments, genders, and ethnicities, echo=FALSE}
+
+# Define descriptive labels for each variable
+variable_labels <- list(
+  "jkl_fihhmnnet1_dv" = "Net Household Monthly Income",
+  "jkl_country" = "Country in the UK sample members currently live in",
+  "jkl_urban_dv" = "Urban or rural area",
+  "jkl_sex_dv" = "Sex",
+  "jkl_ethn_dv" = "Ethnic group"
+)
+
 key_variable <- "jkl_fihhmnnet1_dv"
 variables_to_pair <- c("jkl_country", "jkl_urban_dv", "jkl_sex_dv", "jkl_ethn_dv")
 
@@ -1023,20 +1413,28 @@ for (var in variables_to_pair) {
     next
   }
   
+  # Retrieve descriptive labels
+  key_label <- variable_labels[[key_variable]]
+  paired_label <- variable_labels[[var]]
+  
   plot <- ggplot(data_factors, aes_string(x = var, y = key_variable, fill = var)) +
     geom_boxplot() +
     geom_hline(yintercept = median(data_factors[[key_variable]], na.rm = TRUE), linetype = "dashed", color = "red") +
-    labs(title = paste("Distribution of", key_variable, "across", var),
-         x = var, y = "Net Household Monthly Income") +
+    labs(
+      title = paste("Distribution of", key_label, "across", paired_label),
+      x = paired_label,
+      y = key_label
+    ) +
     ylim(0, 12500) +  # Set the y-axis limit
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
   # Print plot to the R console
   print(plot)
 }
+
 ```
 
-```{r}
+```{r Map of Proportion of various income Bins in Different Regions in the UK, echo=FALSE}
 # Define the numerical key variable
 key_variable <- "jkl_fihhmnnet1_dv"
 
@@ -1099,7 +1497,7 @@ for (bin in unique(uk_data_filtered$income_bin)) {
 
 ```
 
-```{r}
+```{r Proportion of Ethnic groups within Income Bin, echo=FALSE}
 # Define the numerical key variable
 key_variable <- "jkl_fihhmnnet1_dv"
 
@@ -1134,7 +1532,7 @@ for (category in categories) {
     coord_polar("y", start = 0) +
     theme_minimal(base_size = 15) +
     labs(
-      title = paste("Proportion of jkl_ethn_dv within Income Bin", category),
+      title = paste("Proportion of Ethnic groups within Income Bin", category),
       fill = "Ethnic Group",
       y = "Proportion",
       x = ""
@@ -1161,7 +1559,7 @@ Analyzing the relationships between Country and Region variables (jkl_country, j
 
 ###### England
 
-```{r}
+```{r Income Distribution by Employment Status in England, echo=FALSE}
 # Filter data for England
 england_data <- data %>%
   filter(jkl_country == "England")
@@ -1247,7 +1645,7 @@ print(summary_statistics)
 
 ###### Northern Ireland
 
-```{r}
+```{r Income Distribution by Employment Status in Northern Ireland, echo=FALSE}
 # Filter data 
 Northern_Ireland_data <- data %>%
   filter(jkl_country == "Northern Ireland")
@@ -1333,7 +1731,7 @@ print(summary_statistics)
 
 ###### Scotland
 
-```{r}
+```{r Income Distribution by Employment Status in Scotland, echo=FALSE}
 # Filter data 
 Scotland_data <- data %>%
   filter(jkl_country == "Scotland")
@@ -1419,7 +1817,7 @@ print(summary_statistics)
 
 ###### Wales
 
-```{r}
+```{r Income Distribution by Employment Status in Wales, echo=FALSE}
 # Filter data 
 Wales_data <- data %>%
   filter(jkl_country == "Wales")
@@ -1505,7 +1903,7 @@ print(summary_statistics)
 
 ###### North East
 
-```{r}
+```{r Income Distribution by Employment Status in North East, echo=FALSE}
 # Filter data 
 North_East_data <- data %>%
   filter(jkl_gor_dv == "North East")
@@ -1591,7 +1989,7 @@ print(summary_statistics)
 
 ###### West Midlands
 
-```{r}
+```{r Income Distribution by Employment Status in West Midlands, echo=FALSE}
 # Filter data 
 West_Midlands_data <- data %>%
   filter(jkl_gor_dv == "West Midlands")
@@ -1677,7 +2075,7 @@ print(summary_statistics)
 
 ###### North West
 
-```{r}
+```{r Income Distribution by Employment Status in North West, echo=FALSE}
 # Filter data 
 North_West_data <- data %>%
   filter(jkl_gor_dv == "North West")
@@ -1764,7 +2162,7 @@ print(summary_statistics)
 
 ###### Yorkshire and The Humber
 
-```{r}
+```{r Income Distribution by Employment Status in Yorkshire and The Humber, echo=FALSE}
 # Filter data 
 Yorkshire_and_The_Humber_data <- data %>%
   filter(jkl_gor_dv == "Yorkshire and The Humber")
@@ -1851,7 +2249,7 @@ print(summary_statistics)
 
 ###### Scotland
 
-```{r}
+```{r Income Distribution by Employment Status in  Scotland (Part 1), echo=FALSE}
 # Filter data 
 Scotland_data <- data %>%
   filter(jkl_gor_dv == "Scotland")
@@ -1938,7 +2336,7 @@ print(summary_statistics)
 
 ###### East Midlands
 
-```{r}
+```{r Income Distribution by Employment Status in  East Midlands, echo=FALSE}
 # Filter data 
 East_Midlands_data <- data %>%
   filter(jkl_gor_dv == "East Midlands")
@@ -2025,7 +2423,7 @@ print(summary_statistics)
 
 ###### London
 
-```{r}
+```{r Income Distribution by Employment Status in  London, echo=FALSE}
 # Filter data 
 London_data <- data %>%
   filter(jkl_gor_dv == "London")
@@ -2112,7 +2510,7 @@ print(summary_statistics)
 
 ###### South East
 
-```{r}
+```{r Income Distribution by Employment Status in  South East, echo=FALSE}
 # Filter data 
 South_East_data <- data %>%
   filter(jkl_gor_dv == "South East")
@@ -2199,7 +2597,7 @@ print(summary_statistics)
 
 ###### South West
 
-```{r}
+```{r Income Distribution by Employment Status in  South West, echo=FALSE}
 # Filter data 
 South_West_data <- data %>%
   filter(jkl_gor_dv == "South West")
@@ -2286,7 +2684,7 @@ print(summary_statistics)
 
 ###### East of England
 
-```{r}
+```{r Income Distribution by Employment Status in  East of England, echo=FALSE}
 # Filter data 
 East_of_England_data <- data %>%
   filter(jkl_gor_dv == "East of England")
@@ -2373,7 +2771,7 @@ print(summary_statistics)
 
 ###### Wales
 
-```{r}
+```{r Income Distribution by Employment Status in  Wales, echo=FALSE}
 # Filter data 
 Wales_data <- data %>%
   filter(jkl_gor_dv == "Wales")
@@ -2460,7 +2858,7 @@ print(summary_statistics)
 
 ###### Northern Ireland
 
-```{r}
+```{r Income Distribution by Employment Status in  Northern Ireland, echo=FALSE}
 # Filter data 
 Northern_Ireland_data <- data %>%
   filter(jkl_gor_dv == "Northern Ireland")
@@ -2549,7 +2947,8 @@ print(summary_statistics)
 
 Examining the relationship between Urban or Rural Area (jkl_urban_dv) with Household Composition (jkl_hhtype_dv) and Income is also crucial. Urban areas typically have higher living costs but more job opportunities, while rural areas might have lower costs but fewer employment options. Understanding this relationship helps in designing policies that address the unique economic needs of urban and rural households, such as urban housing affordability and rural job creation programs.
 
-```{r}
+```{r Income Distribution for various Household Compositions, echo=FALSE}
+
 # Filter out missing category
 filtered_data <- data %>% filter(jkl_urban_dv != "missing")
 
@@ -2557,9 +2956,9 @@ filtered_data <- data %>% filter(jkl_urban_dv != "missing")
 group1 <- c("1 adult under pensionable age, no children", "1 adult, 1 child", "1 adult, 2 or more children")
 group2 <- c("1 female, age 60+, no children", "1 male, aged 65+, no children", "2 adults, not a couple, 1 or more children")
 group3 <- c("2 adults, not a couple, both under pensionable age, no children", "2 adults, not a couple, one or more over pensionable age, no children", "3 or more adults, 1 or more children, excl. any couples")
-group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age,no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
+group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age, no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
 
-# Create plots for each group
+# Create plots for each group with enhanced titles
 plot_group <- function(data, group, title) {
   ggplot(data %>% filter(jkl_hhtype_dv %in% group), 
          aes(x = jkl_urban_dv, y = jkl_fimnnet_dv, fill = jkl_hhtype_dv)) +
@@ -2574,11 +2973,11 @@ plot_group <- function(data, group, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Plotting each group
-plot1 <- plot_group(filtered_data, group1, 'Group 1: Single Adults and Single Parents')
-plot2 <- plot_group(filtered_data, group2, 'Group 2: Older Adults and Non-couple Adults with Children')
-plot3 <- plot_group(filtered_data, group3, 'Group 3: Non-couple Adults and Large Households with Children')
-plot4 <- plot_group(filtered_data, group4, 'Group 4: Couples and Large Households without Children')
+# Plotting each group with descriptive titles
+plot1 <- plot_group(filtered_data, group1, 'Income Distribution for Single Adults and Single Parents by Area Type')
+plot2 <- plot_group(filtered_data, group2, 'Income Analysis for Older Adults and Non-coupled Adults with Children by Urban/Rural Area')
+plot3 <- plot_group(filtered_data, group3, 'Income Patterns for Non-couple Adults and Larger Households with Children by Area Type')
+plot4 <- plot_group(filtered_data, group4, 'Income Distribution for Couples and Larger Households without Children by Area Type')
 
 # Print the plots
 print(plot1)
@@ -2586,13 +2985,15 @@ print(plot2)
 print(plot3)
 print(plot4)
 
+
 ```
 
 ##### Ethnic Group, Employment Status and Income
 
 The relationship between Ethnic Group (jkl_ethn_dv) and Employment Status and Income helps provide an understanding of how employment status and income vary by ethnic group. This can highlight economic inequalities and potential discrimination in the labor market. This relationship is crucial for developing policies aimed at promoting equal opportunities and reducing economic disparities among different ethnic groups.
 
-```{r}
+```{r Income Distribution by various Ethnic Groups and various Employment Statuses }
+
 # Filter out missing category for ethnic group if needed
 filtered_data <- data %>% filter(jkl_ethn_dv != "missing")
 
@@ -2611,6 +3012,21 @@ employment_statuses <- list(
   group4 = c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
 )
 
+# Create descriptive labels for each group
+ethnic_labels <- c(
+  "African, Arab, Bangladeshi, Caribbean, Chinese",
+  "Other Asian, Black, Mixed, White, or Ethnic Group Backgrounds",
+  "British, Irish, Pakistani, or Indian",
+  "Mixed White and Asian, Black African, or Black Caribbean"
+)
+
+employment_labels <- c(
+  "Paid Employment or Self-Employment",
+  "Unemployed or Retired",
+  "Students, Homemakers, and Those on Leave or Schemes",
+  "Other Inactive or Temporarily Laid Off"
+)
+
 # Function to create plots for each combination of ethnic groups and employment statuses
 plot_combination <- function(data, ethnic_group, employment_group, title) {
   ggplot(data %>% filter(jkl_ethn_dv %in% ethnic_group & jkl_jbstat %in% employment_group), 
@@ -2626,13 +3042,13 @@ plot_combination <- function(data, ethnic_group, employment_group, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Create a nested loop to generate plots for all combinations
+# Create a nested loop to generate plots for all combinations with descriptive titles
 plot_list <- list()
 plot_number <- 1
 
 for (i in seq_along(ethnic_groups)) {
   for (j in seq_along(employment_statuses)) {
-    title <- paste('Group', plot_number, ': Ethnic Group', i, 'and Employment Status', j)
+    title <- paste("Income Distribution by Ethnic Group:", ethnic_labels[i], "and Employment Status:", employment_labels[j])
     plot_list[[plot_number]] <- plot_combination(filtered_data, ethnic_groups[[i]], employment_statuses[[j]], title)
     plot_number <- plot_number + 1
   }
@@ -2642,13 +3058,16 @@ for (i in seq_along(ethnic_groups)) {
 for (plot in plot_list) {
   print(plot)
 }
+
+
 ```
 
 ##### Socio-economic Classification, Income and Employment Status
 
 The relationships between Socio-economic Classification (jkl_jbsoc00_cc, jkl_jbnssec8_dv, jkl_jbnssec5_dv, jkl_jbnssec3_dv) and Income and Employment Status help to understand how social class and occupational status affect income levels and employment opportunities. Higher socio-economic classes generally have better access to high-paying jobs and economic stability. This information is valuable for assessing social mobility and the effectiveness of policies aimed at reducing economic inequality.
 
-```{r}
+```{r Income Distribution for various Socio-economic Classification, echo=FALSE}
+
 # Filter out missing category for NS-SEC if needed
 filtered_data <- data %>% filter(jkl_jbnssec3_dv != "missing")
 
@@ -2658,7 +3077,15 @@ group2 <- c("Unemployed", "Retired")
 group3 <- c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme")
 group4 <- c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
 
-# Create plots for each group
+# Define descriptive titles for each employment status group
+titles <- list(
+  "Income Distribution for Paid Employment and Self-Employed Individuals by NS-SEC Three-Class",
+  "Income Distribution for Unemployed and Retired Individuals by NS-SEC Three-Class",
+  "Income Distribution for Students, Homemakers, and Others on Leave/Schemes by NS-SEC Three-Class",
+  "Income Distribution for Family Care, Temporarily Laid Off, and Other Inactive Individuals by NS-SEC Three-Class"
+)
+
+# Function to create plots for each employment group with descriptive titles
 plot_group <- function(data, group, title) {
   ggplot(data %>% filter(jkl_jbstat %in% group), 
          aes(x = jkl_jbnssec3_dv, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
@@ -2673,24 +3100,26 @@ plot_group <- function(data, group, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Plotting each group
-plot1 <- plot_group(filtered_data, group1, 'Group 1: Paid Employment and Self Employed')
-plot2 <- plot_group(filtered_data, group2, 'Group 2: Unemployed and Retired')
-plot3 <- plot_group(filtered_data, group3, 'Group 3: Students, Homemakers, and Others')
-plot4 <- plot_group(filtered_data, group4, 'Group 4: Family Care, Temporarily Laid Off, and Other Inactive')
+# Plotting each group with descriptive titles
+plot1 <- plot_group(filtered_data, group1, titles[[1]])
+plot2 <- plot_group(filtered_data, group2, titles[[2]])
+plot3 <- plot_group(filtered_data, group3, titles[[3]])
+plot4 <- plot_group(filtered_data, group4, titles[[4]])
 
 # Print the plots
 print(plot1)
 print(plot2)
 print(plot3)
 print(plot4)
+
 ```
 
 ##### Health and Well-being, Employment Status and Income
 
 The implications of how Health and Well-being (jkl_sf12mcs_dv, jkl_sf12pcs_dv, jkl_health, jkl_scghq1_dv, jkl_scghq2_dv) and Employment Status and Income interact are also eye-opening. Poor health can lead to lower employment rates and income levels due to reduced work capacity and higher healthcare costs. Analyzing these relationships can highlight the economic impact of health issues and the importance of healthcare policies that support economic productivity and well-being.
 
-```{r}
+```{r Income Distribution for various Health and Well-being statuses, echo=FALSE}
+
 # Filter out missing category for health status if needed
 filtered_data <- data %>% filter(jkl_health != "missing")
 
@@ -2700,7 +3129,15 @@ group2 <- c("Unemployed", "Retired")
 group3 <- c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme")
 group4 <- c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
 
-# Create box plots for each group
+# Define descriptive titles for each employment status group
+titles <- list(
+  "Income Distribution for Paid Employment and Self-Employed Individuals by Health Status",
+  "Income Distribution for Unemployed and Retired Individuals by Health Status",
+  "Income Distribution for Students, Homemakers, and Others on Leave/Schemes by Health Status",
+  "Income Distribution for Family Care, Temporarily Laid Off, and Other Inactive Individuals by Health Status"
+)
+
+# Function to create box plots for each employment group with descriptive titles
 plot_group <- function(data, group, title) {
   ggplot(data %>% filter(jkl_jbstat %in% group), 
          aes(x = jkl_health, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
@@ -2715,11 +3152,11 @@ plot_group <- function(data, group, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Plotting each group
-plot1 <- plot_group(filtered_data, group1, 'Group 1: Paid Employment and Self Employed')
-plot2 <- plot_group(filtered_data, group2, 'Group 2: Unemployed and Retired')
-plot3 <- plot_group(filtered_data, group3, 'Group 3: Students, Homemakers, and Others')
-plot4 <- plot_group(filtered_data, group4, 'Group 4: Family Care, Temporarily Laid Off, and Other Inactive')
+# Plotting each group with descriptive titles
+plot1 <- plot_group(filtered_data, group1, titles[[1]])
+plot2 <- plot_group(filtered_data, group2, titles[[2]])
+plot3 <- plot_group(filtered_data, group3, titles[[3]])
+plot4 <- plot_group(filtered_data, group4, titles[[4]])
 
 # Print the plots
 print(plot1)
@@ -2727,13 +3164,15 @@ print(plot2)
 print(plot3)
 print(plot4)
 
+
 ```
 
 ##### Household Composition, Size and Income
 
 The interaction between Household Composition and Size (jkl_hhsize, jkl_nkids_dv, jkl_hhtype_dv) with Income shows how larger households or those with more children may have different economic needs and financial pressures compared to smaller households. Understanding these relationships can help in designing social support programs, such as child benefits or family tax credits, to ensure economic stability and well-being for different household types.
 
-```{r}
+```{r Income Distribution for various Household Compositions & Sizes, echo=FALSE}
+
 # Filter out missing category for household type if needed
 filtered_data <- data %>% filter(jkl_hhtype_dv != "missing")
 
@@ -2743,7 +3182,15 @@ group2 <- c("1 female, age 60+, no children", "1 male, aged 65+, no children", "
 group3 <- c("2 adults, not a couple, both under pensionable age, no children", "2 adults, not a couple, one or more over pensionable age, no children", "3 or more adults, 1 or more children, excl. any couples")
 group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age, no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
 
-# Create box plots for each group
+# Define descriptive titles for each household type group
+titles <- list(
+  "Income Distribution for Single Adults and Single Parents by Household Composition",
+  "Income Distribution for Older Adults and Non-couple Adults with Children by Household Composition",
+  "Income Distribution for Non-couple Adults and Large Households with Children by Household Composition",
+  "Income Distribution for Couples and Large Households without Children by Household Composition"
+)
+
+# Function to create box plots for each household type group with descriptive titles
 plot_group <- function(data, group, title) {
   ggplot(data %>% filter(jkl_hhtype_dv %in% group), 
          aes(x = jkl_hhtype_dv, y = jkl_fimnnet_dv, fill = jkl_hhtype_dv)) +
@@ -2758,11 +3205,11 @@ plot_group <- function(data, group, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Plotting each group
-plot1 <- plot_group(filtered_data, group1, 'Group 1: Single Adults and Single Parents')
-plot2 <- plot_group(filtered_data, group2, 'Group 2: Older Adults and Non-couple Adults with Children')
-plot3 <- plot_group(filtered_data, group3, 'Group 3: Non-couple Adults and Large Households with Children')
-plot4 <- plot_group(filtered_data, group4, 'Group 4: Couples and Large Households without Children')
+# Plotting each group with descriptive titles
+plot1 <- plot_group(filtered_data, group1, titles[[1]])
+plot2 <- plot_group(filtered_data, group2, titles[[2]])
+plot3 <- plot_group(filtered_data, group3, titles[[3]])
+plot4 <- plot_group(filtered_data, group4, titles[[4]])
 
 # Print the plots
 print(plot1)
@@ -2770,62 +3217,56 @@ print(plot2)
 print(plot3)
 print(plot4)
 
+
 ```
 
 ##### Tenure, Income and Employment Status
 
 The interaction between housing Tenure (jkl_tenure_dv) with Income and Employment Status is crucial, especially since homeownership is often associated with greater financial stability and wealth accumulation, while renting can be more common among lower-income and less stable employment groups. Analyzing this relationship can inform housing policies aimed at promoting homeownership and addressing rental market challenges.
 
-```{r}
-# Filter out missing category for housing tenure if needed
-filtered_data <- data %>% filter(jkl_tenure_dv != "missing")
+```{r Income Distribution for various Tenures, echo=FALSE}
+# Filter out missing category for household type if needed
+filtered_data <- data %>% filter(jkl_hhtype_dv != "missing")
 
-# Define the groups for the employment statuses
-employment_statuses <- list(
-  group1 = c("Paid employment(ft/pt)", "Self employed"),
-  group2 = c("Unemployed", "Retired"),
-  group3 = c("Student", "Homemaker", "On maternity leave", "On furlough", "On apprenticeship", "LT sick or disabled", "Govt training scheme"),
-  group4 = c("Family care or home", "Temporarily laid off/short term working", "On other scheme", "Other inactive")
+# Define the groups for the household types
+group1 <- c("1 adult under pensionable age, no children", "1 adult, 1 child", "1 adult, 2 or more children")
+group2 <- c("1 female, age 60+, no children", "1 male, aged 65+, no children", "2 adults, not a couple, 1 or more children")
+group3 <- c("2 adults, not a couple, both under pensionable age, no children", "2 adults, not a couple, one or more over pensionable age, no children", "3 or more adults, 1 or more children, excl. any couples")
+group4 <- c("3 or more adults, 1-2 children, incl. at least one couple", "3 or more adults, no children, excl. any couples", "3 or more adults, no children, incl. at least one couple", "Couple 1 or more over pensionable age, no children", "Couple both under pensionable age, no children", "Couple with 1 child", "Couple with 2 children")
+
+# Define descriptive titles for each household type group
+titles <- list(
+  "Income Distribution for Single Adults and Single Parents by Household Composition",
+  "Income Distribution for Older Adults and Non-couple Adults with Children by Household Composition",
+  "Income Distribution for Non-couple Adults and Large Households with Children by Household Composition",
+  "Income Distribution for Couples and Large Households without Children by Household Composition"
 )
 
-# Define the groups for the housing tenure
-housing_tenures <- list(
-  group1 = c("Housing assoc rented", "Local authority rent"),
-  group2 = c("Owned outright", "Owned with mortgage"),
-  group3 = c("Rented from employer", "Rented private furnished", "Rented private unfurnished"),
-  group4 = c("Other", "missing")
-)
-
-# Create box plots for each combination of employment status and housing tenure
-plot_combination <- function(data, tenure_group, status_group, title) {
-  ggplot(data %>% filter(jkl_tenure_dv %in% tenure_group & jkl_jbstat %in% status_group), 
-         aes(x = jkl_tenure_dv, y = jkl_fimnnet_dv, fill = jkl_jbstat)) +
+# Function to create box plots for each household type group with descriptive titles
+plot_group <- function(data, group, title) {
+  ggplot(data %>% filter(jkl_hhtype_dv %in% group), 
+         aes(x = jkl_hhtype_dv, y = jkl_fimnnet_dv, fill = jkl_hhtype_dv)) +
     geom_boxplot() +
     labs(
       title = title,
-      x = 'Housing Tenure (jkl_tenure_dv)',
+      x = 'Household Composition (jkl_hhtype_dv)',
       y = 'Total Estimated Net Monthly Income (jkl_fimnnet_dv)',
-      fill = 'Employment Status'
+      fill = 'Household Composition'
     ) +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# Create and store plots for each combination of groups
-plot_list <- list()
-plot_number <- 1
-
-for (i in seq_along(housing_tenures)) {
-  for (j in seq_along(employment_statuses)) {
-    title <- paste('Plot', plot_number, ': Housing Tenure Group', i, 'and Employment Status Group', j)
-    plot_list[[plot_number]] <- plot_combination(filtered_data, housing_tenures[[i]], employment_statuses[[j]], title)
-    plot_number <- plot_number + 1
-  }
-}
+# Plotting each group with descriptive titles
+plot1 <- plot_group(filtered_data, group1, titles[[1]])
+plot2 <- plot_group(filtered_data, group2, titles[[2]])
+plot3 <- plot_group(filtered_data, group3, titles[[3]])
+plot4 <- plot_group(filtered_data, group4, titles[[4]])
 
 # Print the plots
-for (plot in plot_list) {
-  print(plot)
-}
+print(plot1)
+print(plot2)
+print(plot3)
+print(plot4)
 
 ```
