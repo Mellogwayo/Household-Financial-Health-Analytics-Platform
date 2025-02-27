@@ -23,7 +23,7 @@ install_if_missing <- function(packages) {
 }
 
 # List of necessary packages
-packages <- c("RSQLite", "ggplot2", "tidyr", "dplyr", "plotly", "sf", "viridis", "rmapshaper", "rlang", "scales", "gridExtra")
+packages <- c("RSQLite", "ggplot2", "tidyr", "dplyr", "plotly", "sf", "viridis", "rmapshaper", "rlang", "scales", "gridExtra","reshape2")
 
 # Install and load the necessary packages
 install_if_missing(packages)
@@ -221,12 +221,36 @@ The income range is very wide, from -5589.49 to 102890.9 for the total net perso
 
 ### Calculating Correlation
 ```{r Calculating Correlation, warning=FALSE, message=FALSE, echo=FALSE}
+# Calculate the correlation matrix
 correlation_matrix <- data %>%
-  select(all_of(numeric_variables)) %>% 
+  select(all_of(numeric_variables)) %>%
   cor(use = "complete.obs")
 
-print(correlation_matrix)
+# Melt the correlation matrix for ggplot2
+melted_corr <- melt(correlation_matrix)
+
+# Replace specific variable names with descriptive labels
+variable_labels <- c(
+  "jkl_fimnnet_dv" = "Own Total Estimated Net Monthly Income",
+  "jkl_fihhmnnet1_dv" = "Net Household Monthly Income"
+)
+
+melted_corr$Var1 <- recode(melted_corr$Var1, !!!variable_labels)
+melted_corr$Var2 <- recode(melted_corr$Var2, !!!variable_labels)
+
+# Plot the correlation matrix with descriptive labels and correlation values
+ggplot(data = melted_corr, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +  # Creates colored tiles with white borders
+  geom_text(aes(label = round(value, 2)), color = "black", size = 3) +  # Adds correlation values
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0,
+                       limit = c(-1, 1), space = "Lab", name = "Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Correlation Matrix")
+
+
 ```
+
 
 There is a moderate to strong positive relationship between personal incomes and household incomes. The relationship is strong enough to suggest that higher personal incomes are associated with higher household incomes.
 
@@ -1577,9 +1601,9 @@ england_data_2 <- england_data %>%
 plot1 <- ggplot(england_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in England (Part 1)',
+    title = 'Income Distribution by Employment Status in England: Part 1',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1599,9 +1623,9 @@ plot1 <- ggplot(england_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill 
 plot2 <- ggplot(england_data_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in England (Part 2)',
+    title = 'Income Distribution by Employment Status in England: Part 2',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1663,9 +1687,9 @@ Northern_Ireland_2 <- Northern_Ireland_data %>%
 plot1 <- ggplot(Northern_Ireland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Northern Ireland (Part 1)',
+    title = 'Income Distribution by Employment Status in Northern Ireland:Part 1',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1677,7 +1701,7 @@ plot1 <- ggplot(Northern_Ireland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold"),
     legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
   )
 
@@ -1685,9 +1709,9 @@ plot1 <- ggplot(Northern_Ireland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_
 plot2 <- ggplot(Northern_Ireland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Northern Ireland (Part 2)',
+    title = 'Income Distribution by Employment Status in Northern Ireland:Part 2',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1699,7 +1723,7 @@ plot2 <- ggplot(Northern_Ireland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, f
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold"),
     legend.position = "none"  # Hide legend as fill colors already labeled on x-axis
   )
 
@@ -1749,9 +1773,9 @@ Scotland_2 <- Scotland_data %>%
 plot1 <- ggplot(Scotland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Scotland (Part 1)',
+    title = 'Income Distribution by Employment Status in Scotland: Part 1',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1771,9 +1795,9 @@ plot1 <- ggplot(Scotland_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill
 plot2 <- ggplot(Scotland_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Scotland (Part 2)',
+    title = 'Income Distribution by Employment Status in Scotland: Part 2',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1835,9 +1859,9 @@ Wales_2 <- Wales_data %>%
 plot1 <- ggplot(Wales_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Wales (Part 1)',
+    title = 'Income Distribution by Employment Status in Wales: Part 1',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
@@ -1857,9 +1881,9 @@ plot1 <- ggplot(Wales_data_1, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = 
 plot2 <- ggplot(Wales_2, aes(x = jkl_jbstat, y = jkl_fihhmnnet1_dv, fill = jkl_jbstat)) +
   geom_boxplot() +
   labs(
-    title = 'Income Distribution by Employment Status in Wales (Part 2)',
+    title = 'Income Distribution by Employment Status in Wales: Part 2',
     x = 'Employment Status',
-    y = 'Total Estimated Net Monthly Income (jkl_fihhmnnet1_dv)',
+    y = 'Total Estimated Net Monthly Income',
     fill = 'Employment Status'
   ) +
   scale_y_continuous(
