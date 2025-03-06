@@ -1,0 +1,214 @@
+---
+title: "Predictive Model for Household Financial Health Platform"
+author: "MELISSA OGWAYO"
+date: "2025-03-05"
+output: html_document
+---
+
+## Overview  
+The platform predicts household financial stability using income, employment, health, and household structure. It helps anticipate financial distress using socio-economic and financial data.
+
+**Target Variable:**  
+- `jkl_fihhmnnet1_dv` (Net Household Monthly Income)  
+
+**Predictors:**  
+- Employment status  
+- Health status  
+- Household composition  
+- Tenure type  
+- Location  
+- Socio-economic class  
+
+---
+
+## 1. Data Preparation
+
+### Load Dataset
+
+```{r}
+
+data <- read.csv("/Users/mellogwayo/Desktop/Household Financial Health Analytics Platform/data/processed/transformed_variables.csv")
+
+# View the first few rows of the data 
+head(data)
+```
+
+```{r Load Required Libraries, warning=FALSE, message=FALSE, echo=FALSE}
+# Function to check and install packages if not already installed
+install_if_missing <- function(packages) {
+  for (pkg in packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE)
+  }
+}
+
+# List of necessary packages
+packages <- c("tidyverse", "caret", "randomForest", "glmnet", "ggplot2", "corrplot", "lightgbm", "dplyr", "magrittr", "MASS", "rpart")
+
+# Install and load the necessary packages
+install_if_missing(packages)
+
+```
+
+##2. Initial data cleaning
+
+### Check Data Structure
+```{r}
+str(data)
+summary(data)
+```
+
+### Check Missing Values
+```{r}
+missing_values <- colSums(is.na(data))
+print(missing_values[missing_values > 0])  # Shows columns with missing values
+```
+
+From the result above it can be seen that all columns have zero missing values.
+
+### Check Correlation Between Variables
+```{r}
+library(corrplot)
+
+cor_matrix <- cor(data %>% select_if(is.numeric), use = "complete.obs")
+corrplot(cor_matrix, method = "color")
+
+```
+The correlation plot above shows relationships between different numerical variables in the dataset, with colors indicating the strength and direction of correlations. Dark blue represents strong positive correlations, white indicates no correlation, and dark red signifies strong negative correlations. 
+
+Notably, `jkl_fimnnet_dv` (individual net income) and `jkl_fihhmnnet1_dv` (household net income) exhibit a strong positive correlation, suggesting they are closely related and may introduce redundancy if both are included in the model. This is expected as both variables are representations of income.
+
+Additionally, several `hidp` variables, likely household identifiers, show high correlations with each other, implying redundancy and limited predictive value. Some variables exhibit strong negative correlations, particularly among certain `hidp` variables, indicating inverse relationships. On the other hand, several variables have little to no correlation, meaning they might not be directly related or impactful in prediction. 
+
+Based on these findings, it would be beneficial to drop highly correlated features to prevent multicollinearity, use a Variance Inflation Factor (VIF) test to further assess redundancy, and perform feature selection to refine the predictive model for household financial health. This is why only one income variable `jkl_fihhmnnet1_dv` which represents the Net Household Monthly Income was used as the target variable. None of the household identifier variables were used in the construction of the predictin model.
+
+```{r Initial data cleaning, warning=FALSE, message=FALSE, echo=FALSE}
+
+#Feature Selection
+selected_features <- c("jkl_fihhmnnet1_dv","jkl_jbstat","jkl_health","jkl_hhtype_dv","jkl_tenure_dv","jkl_ethn_dv","jkl_gor_dv","jkl_sex_dv")
+
+data <- data[, selected_features]
+
+#Convert Categorical Variables
+data <- data %>% mutate(across(where(is.character), as.factor))
+head(data)
+
+```
+
+Each of these selcted features are significant determinant of household income. Their interplay determines financial stability, access to resources, and long-term wealth accumulation. 
+
+## 3. Model Training
+We'll test different predictive models: **Linear Regression, Decision Trees, Random Forest, and XGBoost.**
+
+### Train-Test Split
+
+```{r Train-Test Split, warning=FALSE, message=FALSE, echo=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(data$jkl_fihhmnnet1_dv, p = 0.8, list = FALSE)
+train <- data[trainIndex, ]
+test <- data[-trainIndex, ]
+```
+
+### Model 1: Linear Regression
+
+```{r Model 1: Linear Regression, warning=FALSE, message=FALSE, echo=FALSE}
+lm_model <- lm(jkl_fihhmnnet1_dv ~ ., data = train)
+summary(lm_model)
+```
+
+### Model 2: Decision Tree
+
+```{r Model 2: Decision Tree, warning=FALSE, message=FALSE, echo=FALSE}
+tree_model <- rpart(jkl_fihhmnnet1_dv ~ ., data = train, method = "anova")
+print(tree_model)
+```
+
+
+### Model 3: Random Forest
+
+```{r Model 3: Random Forest, warning=FALSE, message=FALSE, echo=FALSE}
+rf_model <- randomForest(jkl_fihhmnnet1_dv ~ ., data = train, ntree = 500)
+print(rf_model)
+```
+
+### Model 4: lightgbm
+
+```{r}
+#install.packages("janitor")
+library(janitor)
+library(caret)
+
+# Clean column names to remove special characters
+train <- train %>% clean_names()
+test <- test %>% clean_names()
+
+## One-Hot Encode Categorical Variables
+# Create dummy variables
+dummies <- dummyVars(" ~ .", data = train)
+
+# Transform train and test sets
+train_encoded <- predict(dummies, newdata = train) %>% as.data.frame()
+test_encoded <- predict(dummies, newdata = test) %>% as.data.frame()
+
+# Ensure column names are LightGBM-safe
+colnames(train_encoded) <- make.names(colnames(train_encoded), unique = TRUE)
+colnames(test_encoded) <- make.names(colnames(test_encoded), unique = TRUE)
+
+# Convert to matrix format
+train_matrix <- as.matrix(train_encoded)
+test_matrix <- as.matrix(test_encoded)
+
+# Prepare LightGBM dataset
+dtrain <- lgb.Dataset(data = train_matrix, label = train$jkl_fihhmnnet1_dv)
+dtest <- lgb.Dataset(data = test_matrix, label = test$jkl_fihhmnnet1_dv)
+
+# Define LightGBM parameters
+params <- list(
+  objective = "regression",
+  metric = "rmse",
+  num_leaves = 31,
+  learning_rate = 0.05
+)
+
+# Train LightGBM model
+lgb_model <- lgb.train(params, dtrain, nrounds = 100)
+print(lgb_model)
+```
+
+### Model 5: Elastic Net Regression
+
+```{r}
+# Convert to matrix
+train_matrix <- as.matrix(train_encoded)
+test_matrix <- as.matrix(test_encoded)
+
+# Train Elastic Net with cross-validation
+elastic_net_model <- cv.glmnet(train_matrix, train$jkl_fihhmnnet1_dv, alpha = 0.5)
+print(elastic_net_model)
+```
+
+
+## 4. Model Evaluation
+
+```{r  Model Evaluation, warning=FALSE, message=FALSE, echo=FALSE}
+# Predict on the test set
+pred_lm <- predict(lm_model, test)
+pred_rf <- predict(rf_model, test)
+pred_tree <- predict(tree_model, test)
+pred_lgb <- predict(lgb_model, test_matrix)
+pred_elastic <- predict(elastic_net_model, test_matrix)
+
+rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+# Calculate RMSE
+cat("Linear Regression RMSE: ", rmse(test$jkl_fihhmnnet1_dv, pred_lm), "\n")
+cat("Random Forest RMSE: ", rmse(test$jkl_fihhmnnet1_dv, pred_rf), "\n")
+cat("Decision Tree RMSE: ", rmse(test$jkl_fihhmnnet1_dv, pred_tree), "\n")
+cat("LightGBM RMSE: ", sqrt(mean((test$jkl_fihhmnnet1_dv - pred_lgb)^2)), "\n")
+cat("Elastic Net RMSE: ", sqrt(mean((test$jkl_fihhmnnet1_dv - pred_elastic)^2)), "\n")
+```
+
