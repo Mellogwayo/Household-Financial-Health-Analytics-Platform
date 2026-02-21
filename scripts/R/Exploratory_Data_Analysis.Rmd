@@ -161,7 +161,6 @@ ggplot(data_percentage, aes(x = jkl_tenure_dv, y = percentage, fill = jkl_tenure
 
 A significant proportion of the population in this data set own their homes.
 
-
 ## Data Exploration and Feature Engineering
 
 ### Numerical Variables: Income Distributions
@@ -220,6 +219,7 @@ The large standard deviation (1596.673) relative to the mean suggests there is s
 The income range is very wide, from -5589.49 to 102890.9 for the total net personal income and from -3306.16 to 104318.9 for the household income. This wide range indicates significant disparities in the dataset, with some individuals having very high incomes and others experiencing losses or debts. It also shows that the dataset has extreme values or outliers. There is a diverse set of incomes, including some cases of significant financial difficulties and some cases of substantial wealth.
 
 ### Calculating Correlation
+
 ```{r Calculating Correlation, warning=FALSE, message=FALSE, echo=FALSE}
 # Calculate the correlation matrix
 correlation_matrix <- data %>%
@@ -251,10 +251,10 @@ ggplot(data = melted_corr, aes(x = Var1, y = Var2, fill = value)) +
 
 ```
 
-
 There is a moderate to strong positive relationship between personal incomes and household incomes. The relationship is strong enough to suggest that higher personal incomes are associated with higher household incomes.
 
 ### Categorical Variables
+
 ```{r Categorical Variables, warning=FALSE, message=FALSE, echo=FALSE}
 # Expanded mapping of variable names to descriptions
 variable_descriptions <- list(
@@ -584,7 +584,6 @@ ggplot(data_proportion, aes(x = jkl_gor_dv, y = proportion, fill = jkl_jbstat)) 
 
 ```
 
-
 ```{r Most Common Employment Status in Each Region, warning=FALSE, message=FALSE, echo=FALSE}
 # Calculate the percentage of each job status within each region
 job_status_percentage <- data %>%
@@ -710,7 +709,6 @@ for (i in 1:5) {
 
 ```
 
-
 ```{r Proportion of Ethnic Group within different Employment Status groups, warning=FALSE, message=FALSE, echo=FALSE}
 # Summarize the data to get proportions within each jkl_jbstat group
 data_summary <- data %>%
@@ -752,7 +750,6 @@ for (category in categories) {
 }
 
 ```
-
 
 #### Socio-economic Classification
 
@@ -905,7 +902,6 @@ for (key_variable in key_variables) {
 
 
 ```
-
 
 ```{r Proportion of Ethnic groups within various job class status, warning=FALSE, message=FALSE, echo=FALSE}
 

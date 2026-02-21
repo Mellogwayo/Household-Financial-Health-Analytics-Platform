@@ -305,70 +305,13 @@ print(coef_df)
 ```
 
 ```{r}
-# Create RMSE data
-rmse_data <- data.frame(
-  Model = c(
-    "Linear Regression",
-    "Decision Tree",
-    "Random Forest",
-    "LightGBM",
-    "Elastic Net"
-  ),
-  RMSE = c(
-    1555.13,
-    2132.37,
-    2134.17,
-    1344.20,
-    84.74354
-  )
-)
-
+install.packages("glmnet")
 ```
 
 ```{r}
-library(ggplot2)
-
-ggplot(rmse_data, aes(x = reorder(Model, RMSE), y = RMSE)) +
-  geom_col(fill = "#4C72B0") +
-  coord_flip() +
-  labs(
-    title = "Model Comparison Using RMSE",
-    subtitle = "Lower RMSE indicates better predictive performance",
-    x = "Model",
-    y = "RMSE"
-  ) +
-  theme_minimal()
-
+library(glmnet)
 ```
 
-```{r}
-ggplot(rmse_data, aes(x = reorder(Model, RMSE), y = RMSE, fill = Model)) +
-  geom_col(show.legend = FALSE) +
-  coord_flip() +
-  scale_fill_manual(values = c(
-    "Elastic Net" = "#55A868",
-    "Linear Regression" = "grey70",
-    "Decision Tree" = "grey70",
-    "Random Forest" = "grey70",
-    "LightGBM" = "grey70"
-  )) +
-  labs(
-    title = "RMSE Comparison Across Models",
-    subtitle = "Elastic Net achieves the lowest prediction error",
-    x = "Model",
-    y = "RMSE"
-  ) +
-  theme_minimal()
-
-ggsave(
-  filename = "rmse_model_comparison.png",
-  width = 8,
-  height = 5,
-  dpi = 300
-)
-
-
-```
 
 
 

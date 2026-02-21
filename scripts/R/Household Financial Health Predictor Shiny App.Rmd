@@ -1,0 +1,106 @@
+---
+title: "Household Financial Health Predictor Shiny App"
+author: "MELISSA OGWAYO"
+date: "2025-03-06"
+output: html_document
+runtime: shiny
+---
+
+## **Introduction**
+This interactive tool predicts a household's financial health based on income, employment, and other key factors.
+
+```{r}
+library(shiny)
+library(randomForest)
+library(xgboost)
+library(tidyverse)
+
+
+# Load trained model
+load("rf_model.RData")  # Ensure the trained model is saved as "rf_model.RData"
+
+# Define UI
+ui <- fluidPage(
+    titlePanel("Household Financial Health Predictor"),
+    
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("employment", "Employment Status:", 
+                        choices = c("Paid employment(ft/pt)", "Self employed", "Unemployed", "Retired",
+                                    "Student", "Homemaker", "On maternity leave", "On furlough")),
+            selectInput("tenure", "Housing Tenure:", 
+                        choices = c("Owned outright", "Owned with mortgage", "Rented private", "Local authority rent")),
+            selectInput("health", "Health Status:", choices = c("Yes", "No")),
+            selectInput("urban", "Urban or Rural:", choices = c("Urban", "Rural")),
+            selectInput("sex", "Gender:", choices = c("Male", "Female")),
+            numericInput("household_income", "Net Monthly Household Income (£):", value = 2500, min = 0, max = 100000),
+            
+            actionButton("predict", "Predict Financial Risk")
+        ),
+        
+        mainPanel(
+            h3("Prediction Result:"),
+            textOutput("result"),
+            plotOutput("importance_plot")
+        )
+    )
+)
+
+# Define Server Logic
+server <- function(input, output) {
+    observeEvent(input$predict, {
+        # Convert inputs into a data frame
+        user_data <- data.frame(
+            jkl_jbstat = as.factor(input$employment),
+            jkl_tenure_dv = as.factor(input$tenure),
+            jkl_health = as.factor(input$health),
+            jkl_urban_dv = as.factor(input$urban),
+            jkl_sex_dv = as.factor(input$sex),
+            jkl_fihhmnnet1_dv = as.numeric(input$household_income)
+        )
+        
+        # Ensure factor levels match training data
+        user_data <- user_data %>%
+            mutate(across(where(is.character), as.factor))
+        
+        # Make prediction
+        prediction <- predict(rf_model, user_data)
+        
+        output$result <- renderText({
+            if (prediction < 1500) {
+                return(paste("High Financial Risk! Predicted Income:", round(prediction, 2), "£"))
+            } else {
+                return(paste("Stable Financial Health. Predicted Income:", round(prediction, 2), "£"))
+            }
+        })
+        
+        # Plot feature importance
+        output$importance_plot <- renderPlot({
+            varImpPlot(rf_model)
+        })
+    })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+```
+
+### Save the Trained Model
+Before running the app, save the trained model so that Shiny can use it.
+
+```{r}
+save(rf_model, file = "rf_model.RData")
+
+```
+
+### Run the Shiny App
+To launch the app, run:
+
+```{r}
+shiny::runApp("app.R")
+
+```
+
+
+
